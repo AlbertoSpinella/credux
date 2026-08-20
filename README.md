@@ -163,6 +163,12 @@ Disable it with `credux config set default_profile.enabled false`. If you had a
 Issues and pull requests are welcome. The project follows strict test-driven
 development.
 
+Development happens in a separate tree, and what arrives here is the released
+state: one commit per release, which is why the history is short and every
+commit is a version. A pull request is read as a proposal rather than something
+merged into this branch - an accepted one is applied upstream and appears in the
+next release commit, credited in the discussion it came from.
+
 ```bash
 git clone https://github.com/AlbertoSpinella/credux.git
 cd credux

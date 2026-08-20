@@ -10,12 +10,14 @@ pip install -e ".[dev]"
 pytest
 ```
 
-`pytest` is the only test dependency. If your environment has `pytest` but not
-credux installed into it, run the suite against the source tree directly:
+`pytest` and `build` are the test dependencies. `build` is used by
+`tests/test_packaging.py` alone, which skips itself when it is missing.
 
-```bash
-PYTHONPATH=src pytest
-```
+`pythonpath = [".", "src"]` in `pyproject.toml` puts both the repo root and
+the source tree on the path, so the suite runs from a checkout whether or not
+credux is installed into the environment, and whether it is invoked as
+`pytest` or as `python -m pytest`. The root is not optional: seven modules
+import fixtures from `tests.test_store`.
 
 ## Conventions
 

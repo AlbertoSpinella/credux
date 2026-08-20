@@ -8,25 +8,21 @@ from credux.errors import UpgradeError, UsageError
 PIPX_PREFIX = "/home/someone/.local/share/pipx/venvs/credux"
 VENV_PREFIX = "/home/someone/src/credux/.venv"
 
-LS_REMOTE = (
-    "aaaa\trefs/tags/v0.1.0\n"
-    "bbbb\trefs/tags/v0.9.0\n"
-    "cccc\trefs/tags/v0.10.0\n"
-    "dddd\trefs/tags/nightly\n"
-)
+def test_the_install_spec_never_points_at_a_private_source(pipx_env, monkeypatch) -> None:
+    """The published project is the only thing a release may install from.
 
-
-def test_repo_url_needs_no_credentials() -> None:
-    """A released credux upgrades itself without an ssh key on file.
-
-    `git ls-remote` and the `git+` install spec both run as whatever user
-    installed credux, so an ssh URL would make `credux upgrade` fail for
-    everyone who is not a collaborator. Anonymous https works against the
-    published repository, which is the mirror and never the private tree.
+    This replaces the guard that used to sit on the repository URL. The
+    constant is gone, but the property it protected is not: whatever
+    `upgrade` hands the installer must name the public release and nothing
+    else.
     """
-    assert upgrade.REPO_URL.startswith("https://")
-    assert upgrade.REPO_URL.endswith("/credux.git")
-    assert "private" not in upgrade.REPO_URL
+    monkeypatch.setattr(upgrade, "_which", lambda name: "/usr/bin/pipx")
+
+    plan = upgrade.plan(version="0.2.0")
+
+    assert plan.command[-1] == "credux==0.2.0"
+    assert "private" not in plan.command[-1]
+    assert "git+" not in plan.command[-1]
 
 
 class FakeCompleted:
@@ -49,6 +45,21 @@ class FakeRunner:
         return FakeCompleted(self.returncode, self.stdout)
 
 
+class FakeFetch:
+    """Stands in for _fetch_json and records the URLs it was given."""
+
+    def __init__(self, payload=None, error=None):
+        self.calls = []
+        self.payload = {"info": {"version": "0.10.0"}} if payload is None else payload
+        self.error = error
+
+    def __call__(self, url):
+        self.calls.append(url)
+        if self.error is not None:
+            raise self.error
+        return self.payload
+
+
 @pytest.fixture
 def pipx_env(monkeypatch):
     """A pipx-managed, non-editable installation with pipx on PATH."""
@@ -58,40 +69,16 @@ def pipx_env(monkeypatch):
     return None
 
 
-def test_a_bare_number_and_a_v_prefixed_tag_mean_the_same_tag():
-    assert upgrade.normalize_ref("0.2.0") == "v0.2.0"
-    assert upgrade.normalize_ref("v0.2.0") == "v0.2.0"
+def test_a_version_is_normalised_with_or_without_its_tag_prefix():
+    assert upgrade.normalize_version("0.2.0") == "0.2.0"
+    assert upgrade.normalize_version("v0.2.0") == "0.2.0"
 
 
-def test_a_ref_that_is_not_a_version_is_refused():
+def test_a_branch_name_is_not_a_release():
     with pytest.raises(UsageError) as excinfo:
-        upgrade.normalize_ref("main")
+        upgrade.normalize_version("main")
 
     assert "main" in str(excinfo.value)
-
-
-def test_the_newest_tag_is_the_highest_number_not_the_last_string():
-    # Lexically 'v0.9.0' sorts after 'v0.10.0'; numerically it is older.
-    runner = FakeRunner(stdout=LS_REMOTE)
-
-    assert upgrade.latest_tag(runner=runner) == "v0.10.0"
-    assert runner.calls == [["git", "ls-remote", "--tags", "--refs", upgrade.REPO_URL]]
-
-
-def test_a_repository_with_no_version_tags_is_an_upgrade_error():
-    runner = FakeRunner(stdout="dddd\trefs/tags/nightly\n")
-
-    with pytest.raises(UpgradeError):
-        upgrade.latest_tag(runner=runner)
-
-
-def test_a_failing_git_call_is_an_upgrade_error_naming_the_repository():
-    runner = FakeRunner(returncode=128)
-
-    with pytest.raises(UpgradeError) as excinfo:
-        upgrade.latest_tag(runner=runner)
-
-    assert upgrade.REPO_URL in str(excinfo.value)
 
 
 def test_a_pipx_installation_is_upgraded_with_pipx(pipx_env, monkeypatch):
@@ -100,12 +87,12 @@ def test_a_pipx_installation_is_upgraded_with_pipx(pipx_env, monkeypatch):
     plan = upgrade.plan(version="0.2.0")
 
     assert plan.manager == "pipx"
-    assert plan.target == "v0.2.0"
+    assert plan.target == "0.2.0"
     assert plan.command == [
         "/usr/bin/pipx",
         "install",
         "--force",
-        f"git+{upgrade.REPO_URL}@v0.2.0",
+        "credux==0.2.0",
     ]
 
 
@@ -117,7 +104,7 @@ def test_a_pipx_layout_without_pipx_on_path_reports_the_manual_command(pipx_env,
 
     message = str(excinfo.value)
     assert "pipx" in message
-    assert f"git+{upgrade.REPO_URL}@v0.2.0" in message
+    assert "credux==0.2.0" in message
 
 
 def test_a_plain_virtualenv_is_upgraded_with_its_own_pip(monkeypatch):
@@ -134,7 +121,7 @@ def test_a_plain_virtualenv_is_upgraded_with_its_own_pip(monkeypatch):
         "pip",
         "install",
         "--upgrade",
-        f"git+{upgrade.REPO_URL}@v0.2.0",
+        "credux==0.2.0",
     ]
 
 
@@ -183,33 +170,14 @@ def test_a_version_together_with_a_clone_is_a_usage_error(pipx_env, tmp_path):
         upgrade.plan(version="0.2.0", source=str(tmp_path))
 
 
-def test_with_no_version_the_newest_tag_is_resolved(pipx_env, monkeypatch):
+def test_with_no_version_the_newest_release_is_resolved(pipx_env, monkeypatch):
     monkeypatch.setattr(upgrade, "_which", lambda name: "/usr/bin/pipx")
-    runner = FakeRunner(stdout=LS_REMOTE)
+    fetch = FakeFetch()
 
-    plan = upgrade.plan(runner=runner)
+    plan = upgrade.plan(fetch=fetch)
 
-    assert plan.target == "v0.10.0"
-    assert plan.command[-1] == f"git+{upgrade.REPO_URL}@v0.10.0"
-
-
-def test_the_real_runner_never_lets_git_prompt_for_credentials(monkeypatch):
-    # The repository is private. Without this, a machine with no ssh key
-    # blocks on git's username prompt behind a captured stdout, which looks
-    # like a hang rather than a failure.
-    import subprocess
-
-    seen = {}
-    monkeypatch.setattr(
-        subprocess,
-        "run",
-        lambda command, **kwargs: seen.update(kwargs) or FakeCompleted(),
-    )
-
-    upgrade._run(["git", "ls-remote"], capture=True)
-
-    assert seen["env"]["GIT_TERMINAL_PROMPT"] == "0"
-    assert seen["capture_output"] is True
+    assert plan.target == "0.10.0"
+    assert plan.command[-1] == "credux==0.10.0"
 
 
 def test_a_pipx_plan_carries_the_venv_it_will_overwrite(pipx_env, monkeypatch):
@@ -267,3 +235,36 @@ def test_a_failing_installer_is_an_upgrade_error():
         upgrade.apply(plan, runner=runner)
 
     assert "pipx install" in str(excinfo.value)
+
+
+def test_the_index_url_names_the_published_project() -> None:
+    """The lookup must never be pointed at anything but the published project."""
+    assert upgrade.PYPI_JSON_URL.startswith("https://pypi.org/pypi/")
+    assert upgrade.PYPI_JSON_URL.endswith("/credux/json")
+    assert "private" not in upgrade.PYPI_JSON_URL
+
+
+def test_the_newest_version_comes_from_the_index() -> None:
+    fetch = FakeFetch()
+
+    assert upgrade.latest_version(fetch=fetch) == "0.10.0"
+    assert fetch.calls == [upgrade.PYPI_JSON_URL]
+
+
+def test_an_unreachable_index_is_reported_rather_than_guessed_at() -> None:
+    fetch = FakeFetch(error=OSError("no route to host"))
+
+    with pytest.raises(UpgradeError) as excinfo:
+        upgrade.latest_version(fetch=fetch)
+
+    message = str(excinfo.value)
+    assert upgrade.PYPI_JSON_URL in message
+    assert "--version" in message
+
+
+def test_a_payload_naming_no_version_is_an_error() -> None:
+    """A 200 with nothing usable in it must not read as 'no upgrade available'."""
+    fetch = FakeFetch(payload={"info": {}})
+
+    with pytest.raises(UpgradeError):
+        upgrade.latest_version(fetch=fetch)

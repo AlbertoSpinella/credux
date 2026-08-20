@@ -1040,7 +1040,7 @@ def upgrade_command(version, source):
 
     if version is None and source is None:
         current = upgrade_module.current_version()
-        if plan.target == f"v{current}":
+        if plan.target == current:
             console.print(f"credux {current} is already the newest release.")
             return
 

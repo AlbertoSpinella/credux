@@ -33,11 +33,10 @@ Runtime dependencies are `boto3`, `click`, `rich`, `keyring`, and `jinja2`.
 
 ## Install
 
-Credux is **not published to PyPI**; `pipx install credux` will not find it.
-Install it from the repository with [pipx](https://pipx.pypa.io/):
+Install it with [pipx](https://pipx.pypa.io/):
 
 ```bash
-pipx install git+https://github.com/AlbertoSpinella/credux.git
+pipx install credux
 credux --version
 ```
 
@@ -47,32 +46,28 @@ your `PATH` (usually `~/.local/bin`). Remove it with `pipx uninstall credux`.
 If you do not have pipx: `brew install pipx`, `apt install pipx`, or
 `python3 -m pip install --user pipx`.
 
-A plain virtual environment does the same job, at the cost of keeping a clone
-around:
+A plain virtual environment does the same job:
 
 ```bash
-git clone https://github.com/AlbertoSpinella/credux.git
-cd credux
 python3 -m venv .venv
-.venv/bin/pip install .
+.venv/bin/pip install credux
 ln -s "$PWD/.venv/bin/credux" ~/.local/bin/credux
 ```
 
 ### Upgrading
 
-`credux upgrade` replaces this installation with another release, straight from
-the repository:
+`credux upgrade` replaces this installation with another release from the
+index:
 
 ```bash
-credux upgrade                   # newest release tag
+credux upgrade                   # newest release
 credux upgrade --version 0.1.0   # a specific release, also a way to repair
 credux upgrade --from ./credux   # whatever is checked out in a local clone
 ```
 
 It drives whichever installer owns the environment credux is running in, and
 refuses an editable install or an installation outside any virtual environment
-rather than writing over either. Since credux is not on PyPI, the tag lookup and
-the install both go to the repository and need git access to it. Details in
+rather than writing over either. Details in
 [docs/releasing.md](docs/releasing.md#how-credux-upgrade-works).
 
 ## Quickstart

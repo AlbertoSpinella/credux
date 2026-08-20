@@ -118,7 +118,7 @@ wrong.
 | `completion.py` | Shell tab completion: renders Click's completion script and supplies the `shell_complete` callbacks. |
 | `shellenv.py` | Renders the `export`/`set` statement `credux env` prints, per shell family. |
 | `browser.py` | Renders and launches `settings.browser_command` for `credux console`. |
-| `upgrade.py` | `credux upgrade`: resolves a release tag, works out which installer owns this installation, runs it. |
+| `upgrade.py` | `credux upgrade`: resolves a release version, works out which installer owns this installation, runs it. |
 | `fsutil.py` | `expand` (`~`/env-var expansion), `atomic_write_text`, `backup_once`. |
 | `errors.py` | `CreduxError` subclasses, each carrying the process exit code it maps to. |
 | `providers/base.py` | `Provider` ABC, `ResolvedCredentials`, `ResolutionContext` (caching + cycle detection), the provider registry. |
@@ -208,9 +208,10 @@ call back into `ctx.resolve`.
 ## Repo-wide rules
 
 - Python >= 3.10. Runtime dependencies are limited to `boto3`, `click`, `rich`,
-  `keyring`, `jinja2`; the only test dependency is `pytest`. Do not add a new
-  runtime or test dependency without updating this list and `pyproject.toml`
-  together.
+  `keyring`, `jinja2`; the test dependencies are `pytest` and `build`, the
+  second only so `tests/test_packaging.py` can build a real sdist and check
+  what it contains. Do not add a new runtime or test dependency without
+  updating this list and `pyproject.toml` together.
 - Nothing personal, corporate, or customer-specific anywhere in the repo except
   the `LICENSE` copyright line and the project URLs in `pyproject.toml`: no real
   names, domains, account ids, or paths. Examples use placeholders such as

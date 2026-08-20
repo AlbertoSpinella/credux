@@ -15,7 +15,10 @@ and the metadata disagree.
 3. Commit that on its own: `chore: release v<x.y.z>`.
 4. Tag the commit: `git tag -a v<x.y.z> -m "v<x.y.z>"`. The tag name is the
    version with a leading `v`; the `pyproject.toml` value never carries one.
-5. Push both: `git push && git push --tags`.
+5. Push both: `git push && git push --tags`. On the published repository the
+   tag push is what starts the release workflow: it runs the suite on every
+   supported Python, refuses a tag that disagrees with `pyproject.toml`, and
+   uploads to the index over OIDC.
 6. Reinstall (`pip install -e .`) if you want the local `credux --version` to
    agree with the tag.
 
@@ -28,20 +31,20 @@ reinstalled.
 
 ## How `credux upgrade` works
 
-Credux is not on PyPI, so both the tag lookup and the install go over https to
-the repository itself rather than to an index. No credentials are involved: the
-repository is public and `git ls-remote` reads its tags anonymously. Git is
-never allowed to prompt for them either (`GIT_TERMINAL_PROMPT=0`), so a machine
-that cannot reach the repository fails immediately instead of appearing to hang
-on a username prompt.
+Credux is published to PyPI, so both the version lookup and the install go to
+the index. The lookup is a single request to the project's JSON document; no
+credentials are involved, and neither git nor a clone is needed on the machine
+being upgraded. An index that cannot be reached is reported as a failure rather
+than treated as "no upgrade available", so a network problem never looks like
+an up-to-date installation.
 
-This is why step 4 above is not optional: a release nobody can see is a release
-`upgrade` cannot resolve. Until the tag is pushed, `credux upgrade` keeps
-reporting the previous version as the newest one.
+This is why the tag push is not optional: it is what triggers publication.
+Until the workflow has run and the version is on the index, `credux upgrade`
+keeps reporting the previous version as the newest one.
 
-**Resolving the version.** With no `--version`, `upgrade` asks the repository for
-its newest `vX.Y.Z` tag (`git ls-remote`) and stops without installing anything
-if that is already the version being run. `--version` always installs, even over
+**Resolving the version.** With no `--version`, `upgrade` asks the index for the
+project's newest release and stops without installing anything if that is
+already the version being run. `--version` always installs, even over
 the same version, so it doubles as a repair. `--from` takes a path and installs
 whatever is checked out there, so it cannot be combined with `--version`.
 

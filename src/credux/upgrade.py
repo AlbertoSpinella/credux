@@ -11,15 +11,16 @@ from pathlib import Path
 
 from .errors import UpgradeError, UsageError
 
-# Credux is not published to PyPI, so an upgrade always installs from the
-# repository itself rather than from an index. This is the https URL, and it
-# must stay anonymous-clonable: `credux upgrade` runs as whoever installed
-# credux, so an ssh URL would work only for a collaborator and fail for every
-# other user. One constant serves both `git ls-remote` and the `git+` install
-# spec, so the scheme has to satisfy pip as well as git.
-REPO_URL = "https://github.com/AlbertoSpinella/credux.git"
+# Version resolution reads the index rather than the repository. One project
+# document answers the only question `upgrade` asks: what is the newest
+# release. Keeping it stdlib means no runtime dependency is added for it.
+PYPI_JSON_URL = "https://pypi.org/pypi/credux/json"
 
-_VERSION_TAG = re.compile(r"^v(\d+)(?:\.(\d+))*$")
+# A socket that never answers looks exactly like a hang, and this call has no
+# output of its own to suggest otherwise.
+_FETCH_TIMEOUT = 10.0
+
+_VERSION_TAG = re.compile(r"^v?(\d+)(?:\.(\d+))*$")
 
 
 @dataclasses.dataclass(frozen=True)
@@ -35,19 +36,40 @@ class UpgradePlan:
 
 
 def _run(command: list[str], capture: bool = False):
-    """Run a command through subprocess, resolved at call time.
-
-    `GIT_TERMINAL_PROMPT=0` is forced on both the tag lookup and the install:
-    the repository is private, so a machine without an ssh key would
-    otherwise sit at git's username prompt with a captured stdout, looking
-    like a hang. With it, git fails immediately and the failure is reported.
-    """
-    import os
+    """Run a command through subprocess, resolved at call time."""
     import subprocess
 
-    env = dict(os.environ)
-    env["GIT_TERMINAL_PROMPT"] = "0"
-    return subprocess.run(command, capture_output=capture, text=True, check=False, env=env)
+    return subprocess.run(command, capture_output=capture, text=True, check=False)
+
+
+def _fetch_json(url: str) -> dict:
+    """GET a JSON document, with the import resolved at call time."""
+    import urllib.request
+
+    with urllib.request.urlopen(url, timeout=_FETCH_TIMEOUT) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def latest_version(fetch=None) -> str:
+    """Ask the index for the newest released version of credux.
+
+    No sorting happens here: the index answers with one version, the same one
+    pip would resolve, so there is no list to order and no chance of the
+    lexical-versus-numeric mistake a tag listing invites.
+    """
+    if fetch is None:
+        fetch = _fetch_json
+    try:
+        document = fetch(PYPI_JSON_URL)
+    except (OSError, ValueError) as exc:
+        raise UpgradeError(
+            f"Could not read {PYPI_JSON_URL} ({exc}). Check the network, or "
+            "pass --version."
+        ) from exc
+    version = (document.get("info") or {}).get("version")
+    if not version:
+        raise UpgradeError(f"{PYPI_JSON_URL} names no released version to upgrade to.")
+    return version
 
 
 def _which(name: str) -> str | None:
@@ -82,49 +104,20 @@ def _is_editable() -> bool:
         return False
 
 
-def normalize_ref(version: str) -> str:
-    """Turn '0.2.0' or 'v0.2.0' into the tag name 'v0.2.0'.
+def normalize_version(version: str) -> str:
+    """Turn 'v0.2.0' or '0.2.0' into the release version '0.2.0'.
 
-    Only release tags are accepted. A branch or a commit sha would install
-    unreleased work under a command whose whole promise is "give me a
-    release", so it is refused rather than quietly allowed.
+    Only release versions are accepted. A branch or a commit sha would
+    install unreleased work under a command whose whole promise is "give me a
+    release", so it is refused rather than quietly allowed. The tag prefix is
+    accepted and stripped: tags carry it, the index does not.
     """
-    candidate = version if version.startswith("v") else f"v{version}"
-    if not _VERSION_TAG.match(candidate):
+    if not _VERSION_TAG.match(version):
         raise UsageError(
             f"{version!r} is not a release version. Pass a number like '0.2.0', "
             "or use --from to install from a local clone."
         )
-    return candidate
-
-
-def _sort_key(tag: str) -> tuple[int, ...]:
-    return tuple(int(part) for part in tag[1:].split("."))
-
-
-def latest_tag(runner=None) -> str:
-    """Ask the repository for its newest release tag.
-
-    Sorted numerically, not lexically: as strings 'v0.9.0' sorts after
-    'v0.10.0', which would pin every future upgrade to an older release.
-    """
-    if runner is None:
-        runner = _run
-    result = runner(["git", "ls-remote", "--tags", "--refs", REPO_URL], capture=True)
-    if result.returncode != 0:
-        raise UpgradeError(
-            f"Could not read the tags of {REPO_URL} (git exited "
-            f"{result.returncode}). Check the network, or pass --version."
-        )
-    tags = [
-        line.split("refs/tags/", 1)[1].strip()
-        for line in (result.stdout or "").splitlines()
-        if "refs/tags/" in line
-    ]
-    versions = [tag for tag in tags if _VERSION_TAG.match(tag)]
-    if not versions:
-        raise UpgradeError(f"{REPO_URL} has no release tags to upgrade to.")
-    return max(versions, key=_sort_key)
+    return version[1:] if version.startswith("v") else version
 
 
 def _unlock(venv: str) -> None:
@@ -192,7 +185,7 @@ def _installer(spec: str) -> tuple[str, list[str], str | None]:
     )
 
 
-def plan(version: str | None = None, source: str | None = None, runner=None) -> UpgradePlan:
+def plan(version: str | None = None, source: str | None = None, fetch=None) -> UpgradePlan:
     """Decide what to install and how, without installing anything."""
     if source is not None:
         if version is not None:
@@ -206,9 +199,9 @@ def plan(version: str | None = None, source: str | None = None, runner=None) -> 
         spec = str(path)
         target = f"the clone at {path}"
     else:
-        tag = normalize_ref(version) if version is not None else latest_tag(runner=runner)
-        spec = f"git+{REPO_URL}@{tag}"
-        target = tag
+        release = normalize_version(version) if version is not None else latest_version(fetch=fetch)
+        spec = f"credux=={release}"
+        target = release
 
     manager, command, venv = _installer(spec)
     return UpgradePlan(manager=manager, target=target, command=command, venv=venv)

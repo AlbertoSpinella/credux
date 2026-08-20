@@ -9,7 +9,6 @@ from credux.cli import cli
 from credux.errors import UpgradeError, UsageError
 
 PIPX_PREFIX = "/home/someone/.local/share/pipx/venvs/credux"
-LS_REMOTE = "aaaa\trefs/tags/v0.1.0\nbbbb\trefs/tags/v0.2.0\n"
 
 
 class FakeCompleted:
@@ -40,15 +39,16 @@ def calls(credux_home, monkeypatch):
 
     def fake_run(command, **kwargs):
         recorded.append(command)
-        if command[:2] == ["git", "ls-remote"]:
-            return FakeCompleted(stdout=LS_REMOTE)
         return FakeCompleted(returncode=0)
 
     monkeypatch.setattr(subprocess, "run", fake_run)
+    # Resolution is a request to the index now, not a subprocess, so it is
+    # stubbed separately and never shows up in `recorded`.
+    monkeypatch.setattr(upgrade, "_fetch_json", lambda url: {"info": {"version": "0.2.0"}})
     return recorded
 
 
-def test_upgrade_installs_the_newest_tag(calls):
+def test_upgrade_installs_the_newest_release(calls):
     result = make_runner().invoke(cli, ["upgrade"])
 
     assert result.exit_code == 0, result.output
@@ -56,19 +56,19 @@ def test_upgrade_installs_the_newest_tag(calls):
         "/usr/bin/pipx",
         "install",
         "--force",
-        f"git+{upgrade.REPO_URL}@v0.2.0",
+        "credux==0.2.0",
     ]
-    assert "v0.2.0" in result.stdout
+    assert "0.2.0" in result.stdout
 
 
-def test_upgrade_does_nothing_when_the_newest_tag_is_already_installed(calls, monkeypatch):
+def test_upgrade_does_nothing_when_the_newest_release_is_already_installed(calls, monkeypatch):
     monkeypatch.setattr(upgrade, "current_version", lambda: "0.2.0")
 
     result = make_runner().invoke(cli, ["upgrade"])
 
     assert result.exit_code == 0, result.output
-    # The tag lookup happened; no installer was run.
-    assert calls == [["git", "ls-remote", "--tags", "--refs", upgrade.REPO_URL]]
+    # The index was consulted; no installer was run.
+    assert calls == []
     assert "0.2.0" in result.stdout
 
 
@@ -78,10 +78,8 @@ def test_an_explicit_version_is_installed_even_if_it_is_the_current_one(calls, m
     result = make_runner().invoke(cli, ["upgrade", "--version", "0.2.0"])
 
     assert result.exit_code == 0, result.output
-    # No tag lookup is needed when the version is spelled out.
-    assert calls == [
-        ["/usr/bin/pipx", "install", "--force", f"git+{upgrade.REPO_URL}@v0.2.0"]
-    ]
+    # No index lookup is needed when the version is spelled out.
+    assert calls == [["/usr/bin/pipx", "install", "--force", "credux==0.2.0"]]
 
 
 def test_a_failing_installer_exits_with_the_upgrade_error_code(calls, monkeypatch):

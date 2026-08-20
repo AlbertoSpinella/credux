@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "credux"
-version = "0.1.1"
+version = "0.2.0"
 description = "Manage cloud credentials and the profiles that use them"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -44,7 +44,7 @@ Repository = "https://github.com/AlbertoSpinella/credux"
 Issues = "https://github.com/AlbertoSpinella/credux/issues"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "build>=1.0"]
 
 [project.scripts]
 credux = "credux.cli:main"
@@ -58,6 +58,34 @@ credux = "credux.cli:main"
 # to the wheel archive at the same path".
 packages = ["src/credux"]
 
+[tool.hatch.build.targets.sdist]
+# An allowlist, not the default "everything the VCS does not ignore". Built
+# from a checkout that carries local tooling, the default would ship it, and
+# a file uploaded to an index can be yanked but never withdrawn. Keep this
+# list and ALLOWED_PREFIXES in tests/test_packaging.py in step.
+include = [
+    "src/",
+    "tests/",
+    "docs/",
+    "examples/",
+    # tests/test_publish_workflow.py reads the workflow, so an sdist without
+    # it would ship a suite that cannot pass.
+    ".github/",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+    # Not a choice: hatchling puts .gitignore in every sdist regardless. Named
+    # here so this list and the test's stay the same list.
+    ".gitignore",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+# Seven test modules import fixtures from `tests.test_store`, which needs the
+# repo root importable, and the suite needs `src` when credux is not installed
+# into the environment running it. `python -m pytest` happened to supply the
+# first by putting the working directory on sys.path; the bare `pytest` console
+# script does not, so the documented invocation only ever worked one of the two
+# ways it is written. Naming both here makes either spelling work.
+pythonpath = [".", "src"]

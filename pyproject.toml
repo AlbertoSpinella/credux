@@ -1,0 +1,63 @@
+[build-system]
+# >=1.27 rejects, rather than downgrades, the PEP 639 `license` keys below.
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "credux"
+version = "0.1.0"
+description = "Manage cloud credentials and the profiles that use them"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Alberto Spinella" }]
+keywords = ["aws", "credentials", "iam", "sso", "identity-center", "profiles", "cli"]
+# A "License :: OSI Approved :: ..." classifier must not be added back: PyPI
+# rejects an upload carrying both that and the `license` expression above.
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "boto3>=1.34",
+    "click>=8.1",
+    "rich>=13.0",
+    "keyring>=24.0",
+    "jinja2>=3.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/AlbertoSpinella/credux"
+Repository = "https://github.com/AlbertoSpinella/credux"
+Issues = "https://github.com/AlbertoSpinella/credux/issues"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+credux = "credux.cli:main"
+
+[tool.hatch.build.targets.wheel]
+# `packages` already makes hatchling walk the whole `src/credux` tree and ship
+# every non-excluded file, so `src/credux/templates/*.j2` (the built-in
+# integration templates) is package data with no further declaration needed.
+# Do not add a `force-include` entry for it: hatchling would then try to add
+# the same path twice and fail the build with "A second file is being added
+# to the wheel archive at the same path".
+packages = ["src/credux"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

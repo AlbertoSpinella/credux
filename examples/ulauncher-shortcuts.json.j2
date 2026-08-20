@@ -1,0 +1,14 @@
+{
+{%- for cred in credentials %}
+  "credux-{{ loop.index }}": {
+    "id": "credux-{{ loop.index }}",
+    "name": "AWS console: {{ cred.profile }}",
+    "keyword": "{{ cred.profile }}",
+    "cmd": "credux console {{ cred.profile }}",
+    "is_default_search": false,
+    "run_without_argument": true,
+    "icon": "",
+    "added": 0
+  }{{ "," if not loop.last }}
+{%- endfor %}
+}

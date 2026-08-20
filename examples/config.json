@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "settings": {
+    "aws_credentials_file": "~/.aws/credentials",
+    "aws_config_file": "~/.aws/config",
+    "default_profile": {"enabled": true, "access_key_id": "test", "secret_access_key": "test"},
+    "browser_command": ["firefox", "ext+container:name={profile}&url={url}"],
+    "refresh_threshold_minutes": 10,
+    "console_destination": "https://console.aws.amazon.com/"
+  },
+  "naming": {
+    "iam_user": "{org}-{account_name}-User-{user}",
+    "iam_role": "{org}-{account_name}-Role-{role}",
+    "iam_sso": "{org}-{account_name}-SSO-{role}",
+    "management_account_prefix": "management_"
+  },
+  "sso_sessions": {
+    "acme": {
+      "start_url": "https://acme.awsapps.com/start",
+      "sso_region": "eu-west-1",
+      "management_account_id": "111111111111"
+    }
+  },
+  "integrations": [
+    {
+      "name": "shell-aliases",
+      "enabled": true,
+      "template": "builtin:aliases.sh.j2",
+      "dest": "~/.credux/generated/aliases.sh"
+    },
+    {
+      "name": "launcher-shortcuts",
+      "enabled": false,
+      "mode": "replace",
+      "template": "~/.credux/templates/ulauncher-shortcuts.json.j2",
+      "dest": "~/.config/ulauncher/shortcuts.json"
+    }
+  ],
+  "post_sync": [],
+  "credentials": []
+}

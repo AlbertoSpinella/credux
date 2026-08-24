@@ -152,9 +152,9 @@ def test_completion_offers_nothing_when_there_is_no_config_at_all(credux_home):
     assert complete(["start"], "acme") == []
 
 
-# --- the 'completions' command behind the pu wrapper ------------------------
+# --- the 'completions' command behind the cdx wrapper ------------------------
 #
-# `pu` is a shell function, so Click's generated script - which registers
+# `cdx` is a shell function, so Click's generated script - which registers
 # itself against the `credux` command only - never sees it. Its completer
 # calls this command instead, and offers whatever it prints.
 
@@ -195,7 +195,7 @@ def test_completions_profiles_lists_every_profile_with_no_prefix(credux_home):
 
 @pytest.mark.parametrize("incomplete", ["", "billing", "BILLING", "acme", "nope"])
 def test_completions_profiles_offers_exactly_what_credux_env_offers(credux_home, incomplete):
-    """The point of the command: `pu <TAB>` and `credux env <TAB>` must offer
+    """The point of the command: `cdx <TAB>` and `credux env <TAB>` must offer
     the same set, so one completer cannot drift from the other."""
     write_config(
         credux_home,

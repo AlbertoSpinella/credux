@@ -1,5 +1,5 @@
 # Add to ~/.config/fish/config.fish:  credux shell-init --shell fish | source
-function pu
+function cdx
   set -l credux_statement
   if test (count $argv) -eq 0
     set credux_statement (credux env --unset --shell fish)
@@ -11,7 +11,7 @@ function pu
   # `set x (cmd)` reports cmd's exit status: the status where fish provides
   # one, and an empty capture otherwise (credux writes its error to stderr,
   # which is not captured, and prints nothing on stdout when it fails).
-  # Either way `pu badprofile` fails instead of silently doing nothing.
+  # Either way `cdx badprofile` fails instead of silently doing nothing.
   if test $credux_status -ne 0
     return $credux_status
   end
@@ -21,7 +21,7 @@ function pu
   printf '%s\n' $credux_statement | source
 end
 
-# Tab completion for `pu`: the Click-generated script completes the `credux`
+# Tab completion for `cdx`: the Click-generated script completes the `credux`
 # command alone, so the wrapper function needs its own. Asking credux for the
-# candidates is what makes `pu <TAB>` offer what `credux env <TAB>` offers.
-complete --no-files --command pu --arguments "(credux completions profiles (commandline -t))"
+# candidates is what makes `cdx <TAB>` offer what `credux env <TAB>` offers.
+complete --no-files --command cdx --arguments "(credux completions profiles (commandline -t))"

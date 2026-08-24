@@ -5,6 +5,18 @@ and every release is one commit: the history of this repository is the list
 below. Versions follow [semantic versioning](https://semver.org/); while the
 major version is `0`, a minor bump is where a breaking change may appear.
 
+## 0.3.0 - 2026-08-24
+
+### Changed
+
+- **The `pu` shell function is now `cdx`.** Breaking: `pu` is gone. The
+  function `credux shell-init` prints, and the completer registered for it,
+  are both named `cdx` - `cdx acme-billing-User-ada` sets `AWS_PROFILE` in the
+  current shell, `cdx` with no argument unsets it, and `cdx mana<TAB>` still
+  completes profile names. The new name arrives with the output your shell rc
+  already sources, so open a new shell after upgrading; a `pu` left over from
+  a previous `eval` lives only in shells started before the upgrade.
+
 ## 0.2.1 - 2026-08-24
 
 ### Added

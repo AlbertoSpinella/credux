@@ -33,8 +33,8 @@ Type "aws sts get-caller-identity --profile acme-billing-User-ada"
 Enter
 Sleep 4s
 
-# ...and `pu` puts it in this shell, for every tool that reads AWS_PROFILE.
-Type "pu billing"
+# ...and `cdx` puts it in this shell, for every tool that reads AWS_PROFILE.
+Type "cdx billing"
 Enter
 Sleep 2s
 Type "terraform plan | head -3"

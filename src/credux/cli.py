@@ -857,13 +857,13 @@ def env(ctx, profile, shell_name, unset):
 @click.option("--shell", "shell_name", default=None, help="posix, fish, or powershell.")
 @click.pass_context
 def shell_init(ctx, shell_name):
-    """Print the shell wrapper that gives you the 'pu' command and tab completion.
+    """Print the shell wrapper that gives you the 'cdx' command and tab completion.
 
-    Add 'eval "$(credux shell-init)"' to your shell rc, then use 'pu <profile>'
-    to switch the current shell's AWS_PROFILE and 'pu' with no argument to
+    Add 'eval "$(credux shell-init)"' to your shell rc, then use 'cdx <profile>'
+    to switch the current shell's AWS_PROFILE and 'cdx' with no argument to
     unset it. The same output registers tab completion for credux's
     subcommands, profile names, and Identity Center session names, and for
-    'pu' itself.
+    'cdx' itself.
     """
     shell = shell_name or shellenv.detect_shell()
     filename = SHELL_FILES.get(shell)
@@ -895,7 +895,7 @@ def completions_group() -> None:
 def completions_profiles(incomplete: str) -> None:
     """Print the profile names matching INCOMPLETE, one per line.
 
-    `pu` is a shell function, so Click's generated script - which registers
+    `cdx` is a shell function, so Click's generated script - which registers
     itself against the `credux` command alone - never completes it. Its
     completer calls this instead, and it deliberately goes through the same
     completer `credux env <TAB>` uses so the two offer the same set.

@@ -16,7 +16,7 @@ five-line quickstart, see the [README](../README.md).
 | `credux stop <profile>...` | Removes those profiles from the managed block. `--all` stops everything. |
 | `credux refresh` | Re-resolves active sessions close to expiry. `--all` re-resolves every active session; `--threshold` overrides the window. |
 | `credux env <profile>` | Prints the `export AWS_PROFILE=...` statement for your shell to `eval`. `--unset` to clear it; `--shell` to pick a syntax. |
-| `credux shell-init` | Prints the `pu` shell function and tab-completion registration. `--shell posix\|fish\|powershell`. |
+| `credux shell-init` | Prints the `cdx` shell function and tab-completion registration. `--shell posix\|fish\|powershell`. |
 | `credux console <profile>` | Opens the AWS Management Console for that credential in a browser (container by default). |
 | `credux login <session>` | Runs the Identity Center device-authorization flow and caches the token. |
 | `credux sync [session]` | Discovers Identity Center accounts and permission sets, creates/renames profiles, then runs integrations and `post_sync`. `--prune` removes profiles for roles you lost access to. |
@@ -77,17 +77,17 @@ Anything else leaves every file untouched. What credux does not delete: the
 the cached Identity Center tokens under `~/.aws/sso/cache`, and your `naming`
 templates, `integrations`, and `post_sync` settings.
 
-## Selecting a profile in your shell: `pu`
+## Selecting a profile in your shell: `cdx`
 
-`pu` is a shell function, not a credux subcommand. A child process cannot change
-its parent shell's environment, so `credux env` prints a statement (`export
-AWS_PROFILE=...`) for the shell to `eval`, and `pu` (installed by sourcing the
-output of `credux shell-init`) is a two-line wrapper around that.
+`cdx` is a shell function, not a credux subcommand. A child process cannot
+change its parent shell's environment, so `credux env` prints a statement
+(`export AWS_PROFILE=...`) for the shell to `eval`, and `cdx` (installed by
+sourcing the output of `credux shell-init`) is a two-line wrapper around that.
 
 ```bash
 eval "$(credux shell-init)"        # put this line in your shell rc, once
-pu acme-billing-User-ada           # sets AWS_PROFILE in *this* shell
-pu                                 # no argument: unsets AWS_PROFILE again
+cdx acme-billing-User-ada          # sets AWS_PROFILE in *this* shell
+cdx                                # no argument: unsets AWS_PROFILE again
 ```
 
 `credux shell-init` detects your shell automatically, or takes `--shell
@@ -107,18 +107,18 @@ session names from your config. Profile completion matches the same way the
 commands themselves do - substring, case insensitive - so anything offered is
 something the command will accept.
 
-`pu` completes profile names too: `pu mana<TAB>` offers every profile whose name
-contains `mana`, the same set `pu mana<Enter>` would have searched. Because `pu`
-is a shell function rather than a command, the shell cannot learn about it from
-credux's own completion script, so each wrapper registers a completer that asks
-`credux completions profiles` for the candidates - one list, so `pu <TAB>` and
-`credux env <TAB>` can never drift apart.
+`cdx` completes profile names too: `cdx mana<TAB>` offers every profile whose
+name contains `mana`, the same set `cdx mana<Enter>` would have searched.
+Because `cdx` is a shell function rather than a command, the shell cannot learn
+about it from credux's own completion script, so each wrapper registers a
+completer that asks `credux completions profiles` for the candidates - one
+list, so `cdx <TAB>` and `credux env <TAB>` can never drift apart.
 
-Completion is available for bash, zsh, and fish, and `pu` completion also works
+Completion is available for bash, zsh, and fish, and `cdx` completion also works
 in PowerShell. The `posix` wrapper serves both bash and zsh, and their
 completion scripts are not interchangeable, so it carries both and picks the
 right one when your shell starts. There is no PowerShell completion for the
-`credux` command itself; `credux shell-init --shell powershell` prints the `pu`
+`credux` command itself; `credux shell-init --shell powershell` prints the `cdx`
 wrapper and its completer.
 
 If completion does not appear, the usual causes are a shell that has not re-read

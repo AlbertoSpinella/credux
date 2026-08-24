@@ -80,16 +80,16 @@ rather than writing over either. Details in
 credux add iam-user            # prompts for org, account, user, and keys
 credux start acme-billing-User-ada
 eval "$(credux shell-init)"    # add this line to your shell rc instead, once
-pu acme-billing-User-ada       # sets AWS_PROFILE in *this* shell
+cdx acme-billing-User-ada      # sets AWS_PROFILE in *this* shell
 aws sts get-caller-identity
 credux console acme-billing-User-ada   # open the account in a browser container
 ```
 
 `credux start` writes the profile into `~/.aws/credentials`, so any tool that
-reads a profile can use it right away. `credux shell-init` installs the `pu`
-shell function (which sets `AWS_PROFILE` in your current shell) and registers tab
-completion for bash, zsh, and fish - for the `credux` commands and for `pu`
-itself, so `pu mana<TAB>` offers the profiles that match.
+reads a profile can use it right away. `credux shell-init` installs the `cdx`
+shell function (which sets `AWS_PROFILE` in your current shell) and registers
+tab completion for bash, zsh, and fish - for the `credux` commands and for
+`cdx` itself, so `cdx mana<TAB>` offers the profiles that match.
 
 Profile names are searched, not spelled out: `credux console billing` finds
 `acme-billing-User-ada`, and an ambiguous term asks which one you meant.
@@ -183,7 +183,7 @@ Disable it with `credux config set default_profile.enabled false`. If you had a
 
 | Document | Covers |
 |---|---|
-| [docs/usage.md](docs/usage.md) | Every command, profile searching, `pu` and completion, Identity Center, several sessions at once, scheduled refresh, browser containers. |
+| [docs/usage.md](docs/usage.md) | Every command, profile searching, `cdx` and completion, Identity Center, several sessions at once, scheduled refresh, browser containers. |
 | [docs/configuration.md](docs/configuration.md) | Every `config.json` key: settings, naming templates, the management-account prefix, integrations, `post_sync` hooks. |
 | [docs/security.md](docs/security.md) | Where secrets live and where they never go, file permissions, the one-time backup. |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | `credux doctor`, keychain on headless Linux and WSL, exit codes. |

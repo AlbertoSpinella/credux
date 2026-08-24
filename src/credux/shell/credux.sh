@@ -1,8 +1,8 @@
 # Add to ~/.bashrc or ~/.zshrc:  eval "$(credux shell-init)"
-pu() {
+cdx() {
   # Declared on its own line on purpose: in `local x=$(cmd)` the exit status
   # belongs to `local`, not to the command substitution, so a failing
-  # `credux env` would go unnoticed and `pu badprofile` would silently do
+  # `credux env` would go unnoticed and `cdx badprofile` would silently do
   # nothing. credux's error message goes to stderr and is not captured here.
   local _credux_statement
   if [ "$#" -eq 0 ]; then

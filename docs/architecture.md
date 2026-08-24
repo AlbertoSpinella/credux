@@ -128,7 +128,7 @@ wrong.
 | `providers/aws/federation.py` | Exchanges credentials for a console sign-in URL via the AWS federation endpoint. |
 | `providers/aws/org.py` | Best-effort Organizations management-account detection; a denied or failed API call means "unknown", never a crash. |
 | `templates/` | Built-in Jinja2 integration templates, shipped as package data. |
-| `shell/` | The `pu` shell-function wrappers printed by `credux shell-init`, one per shell family. Also package data. |
+| `shell/` | The `cdx` shell-function wrappers printed by `credux shell-init`, one per shell family. Also package data. |
 
 Every module starts with a docstring stating its single responsibility. Public
 functions carry type hints.
@@ -177,12 +177,12 @@ so the group callback has not run and there is no `App` on the context. It loads
 traceback would be printed over the user's prompt line at the moment they
 pressed TAB.
 
-Completing `pu` is a third constraint. It is a shell function, so Click's
+Completing `cdx` is a third constraint. It is a shell function, so Click's
 script - which registers itself against the `credux` command alone - never sees
 it, and each wrapper carries a completer of its own. Those completers ask the
 hidden `credux completions profiles` command, which calls the same
 `complete_profiles` the `credux env` argument uses, so the two lists cannot
-drift. The bash and zsh completers live in `shell/pu.bash` and `shell/pu.zsh`
+drift. The bash and zsh completers live in `shell/cdx.bash` and `shell/cdx.zsh`
 rather than in `credux.sh`: they ride the same quoted heredoc as Click's
 scripts, which keeps `credux.sh` parseable by any POSIX shell. They read only
 stdout and discard stderr and the exit status - the group callback loads the

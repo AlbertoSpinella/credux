@@ -7,7 +7,7 @@ it, and a quickstart.
 
 | Document | Covers |
 |---|---|
-| [usage.md](usage.md) | Command reference, profile searching, `pu` and tab completion, Identity Center, running several sessions at once, scheduled refresh, the AWS console and browser containers. |
+| [usage.md](usage.md) | Command reference, profile searching, `cdx` and tab completion, Identity Center, running several sessions at once, scheduled refresh, the AWS console and browser containers. |
 | [configuration.md](configuration.md) | Every key in `config.json`: `settings`, naming templates and the management-account prefix, `sso_sessions`, `integrations`, `post_sync`. |
 | [security.md](security.md) | Why credux writes a credentials file rather than wrapping your commands, where secrets live and where they never go, file permissions, the one-time backup, the console-URL caveat. |
 | [troubleshooting.md](troubleshooting.md) | `credux doctor`, keychain on headless Linux and WSL, common failures, the exit-code table. |

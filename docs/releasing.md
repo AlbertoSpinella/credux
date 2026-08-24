@@ -48,6 +48,28 @@ already the version being run. `--version` always installs, even over
 the same version, so it doubles as a repair. `--from` takes a path and installs
 whatever is checked out there, so it cannot be combined with `--version`.
 
+**Two sources, and one of them is cached.** The version number and the files
+come from different places. `latest_version` reads PyPI's JSON document over
+urllib; the installer reads the file listing through pip. PyPI serves that
+listing with `cache-control: max-age=600`, and pip keeps its own copy for as
+long as it is allowed to, so for the first minutes after a release the two
+disagree and credux asks pip for a version pip is convinced does not exist:
+
+```
+ERROR: Could not find a version that satisfies the requirement credux==0.3.0
+       (from versions: 0.2.0, 0.2.1)
+```
+
+Two things answer this. The install command carries `--no-cache-dir`
+(`--pip-args=--no-cache-dir` through pipx), so pip's own copy is never
+consulted - it costs a re-download of the wheels on every upgrade, about
+17 MB of which nearly all is botocore. And when the installer still cannot
+find a version that came from the index, `apply` says so in those terms
+rather than passing pip's message through, because raw it reads as "that
+release does not exist" one line under credux announcing that it does. Only
+that combination is explained: a version the *user* named and pip cannot find
+is a typo, and every other installer failure speaks for itself.
+
 **Choosing the installer.** It drives whichever installer owns the environment
 credux is running in: `pipx install --force` for a pipx installation, `pip
 install --upgrade` inside a plain virtual environment. Two cases are refused
@@ -58,7 +80,11 @@ rather than guessed at, both with exit code 8:
 - an installation outside any virtual environment, where pip would write into
   the system or user site directory.
 
-**Why the command prints nothing afterwards.** Credux is replacing the
+**Why the command prints nothing afterwards.** The installer's stderr is teed,
+not captured: `apply` has to read it to tell one failure from another, but
+pipx writes its whole running commentary there, and holding that back until
+the process exits would leave a minute-long install looking hung. Every line
+is written through as it arrives and kept. After that, credux is replacing the
 environment it is running from, so it exits as soon as the installer returns.
 Anything computed after `apply` returns risks importing a module that is already
 gone. On Windows the running `credux.exe` may be locked, in which case the

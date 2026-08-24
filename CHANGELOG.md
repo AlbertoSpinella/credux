@@ -5,6 +5,21 @@ and every release is one commit: the history of this repository is the list
 below. Versions follow [semantic versioning](https://semver.org/); while the
 major version is `0`, a minor bump is where a breaking change may appear.
 
+## 0.3.1 - 2026-08-24
+
+### Fixed
+
+- **`credux upgrade` no longer fails on a release published minutes ago.**
+  The version number and the files come from two places - the JSON document
+  credux reads, and the file listing pip reads - and PyPI serves the listing
+  with a ten-minute cache, so the two disagreed just after a release and pip
+  was asked for a version it was convinced did not exist. The install now
+  carries `--no-cache-dir`, and when the index itself is still catching up the
+  failure says so instead of passing pip's `No matching distribution found`
+  through, which read as "that release does not exist" one line under credux
+  announcing that it did. A version *you* named and pip cannot find is still
+  reported as it was: that one is a typo, not a lag.
+
 ## 0.3.0 - 2026-08-24
 
 ### Changed

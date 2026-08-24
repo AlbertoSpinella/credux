@@ -16,6 +16,26 @@ from .errors import UpgradeError, UsageError
 # release. Keeping it stdlib means no runtime dependency is added for it.
 PYPI_JSON_URL = "https://pypi.org/pypi/credux/json"
 
+# The installer must not be answered out of a stale copy of the index. PyPI
+# serves the file listing with `cache-control: max-age=600`, and pip keeps its
+# own copy for that long, while `latest_version` below reads the JSON document
+# over urllib and never sees that cache at all. Minutes after a release the two
+# disagree, and credux then asks pip for a version pip is convinced does not
+# exist. Bypassing pip's cache costs a re-download of the wheels on every
+# upgrade - about 17 MB, nearly all of it botocore - which is the cheaper half
+# of the trade against an upgrade that fails for a reason nothing on screen
+# explains.
+_NO_CACHE = "--no-cache-dir"
+_PIPX_NO_CACHE = f"--pip-args={_NO_CACHE}"
+
+# What pip says when the version it was asked for is not in the listing it
+# read. Both spellings occur: the first is the resolver's, the second the
+# summary pipx quotes back.
+_VERSION_NOT_FOUND = re.compile(
+    r"no matching distribution found|could not find a version that satisfies",
+    re.IGNORECASE,
+)
+
 # A socket that never answers looks exactly like a hang, and this call has no
 # output of its own to suggest otherwise.
 _FETCH_TIMEOUT = 10.0
@@ -33,13 +53,34 @@ class UpgradePlan:
     # The venv the installer will recreate, if it recreates one at all. Only
     # pipx does; see `_unlock` for why apply() needs to know.
     venv: str | None = None
+    # True when the version came from the index rather than from --version or
+    # --from. Only then does "the installer cannot find it" contradict
+    # something credux said itself, which is what `apply` reports on.
+    resolved_from_index: bool = False
 
 
-def _run(command: list[str], capture: bool = False):
-    """Run a command through subprocess, resolved at call time."""
+def _run(command: list[str]):
+    """Run a command through subprocess, resolved at call time.
+
+    stderr is teed rather than captured: `apply` has to read it - one
+    installer failure is a stale index and every other one is not, and the
+    text is the only thing that tells them apart - but pipx writes its whole
+    running commentary there, so swallowing it until the process exits would
+    leave a minute-long install looking hung. Each line is written through as
+    it arrives and kept. stdout is not touched at all.
+    """
     import subprocess
 
-    return subprocess.run(command, capture_output=capture, text=True, check=False)
+    process = subprocess.Popen(command, stderr=subprocess.PIPE, text=True)
+    captured: list[str] = []
+    with process:
+        for line in process.stderr:  # type: ignore[union-attr]
+            sys.stderr.write(line)
+            # The installer's output is worth nothing late: unbuffer it so it
+            # reaches a redirected stderr at the same time as a terminal one.
+            sys.stderr.flush()
+            captured.append(line)
+    return subprocess.CompletedProcess(command, process.returncode, None, "".join(captured))
 
 
 def _fetch_json(url: str) -> dict:
@@ -166,7 +207,7 @@ def _installer(spec: str) -> tuple[str, list[str], str | None]:
         )
 
     prefix = Path(sys.prefix)
-    manual = f"pipx install --force {spec}"
+    manual = f"pipx install --force {_PIPX_NO_CACHE} {spec}"
     if prefix.parent.name == "venvs" and prefix.parent.parent.name == "pipx":
         pipx = _which("pipx")
         if pipx is None:
@@ -174,10 +215,14 @@ def _installer(spec: str) -> tuple[str, list[str], str | None]:
                 f"This credux was installed by pipx, but pipx is not on PATH. "
                 f"Run: {manual}"
             )
-        return "pipx", [pipx, "install", "--force", spec], str(prefix)
+        return "pipx", [pipx, "install", "--force", _PIPX_NO_CACHE, spec], str(prefix)
 
     if sys.prefix != sys.base_prefix:
-        return "pip", [sys.executable, "-m", "pip", "install", "--upgrade", spec], None
+        return (
+            "pip",
+            [sys.executable, "-m", "pip", "install", "--upgrade", _NO_CACHE, spec],
+            None,
+        )
 
     raise UpgradeError(
         "credux is not installed in a virtual environment, so it cannot upgrade "
@@ -187,6 +232,7 @@ def _installer(spec: str) -> tuple[str, list[str], str | None]:
 
 def plan(version: str | None = None, source: str | None = None, fetch=None) -> UpgradePlan:
     """Decide what to install and how, without installing anything."""
+    from_index = False
     if source is not None:
         if version is not None:
             raise UsageError(
@@ -199,12 +245,53 @@ def plan(version: str | None = None, source: str | None = None, fetch=None) -> U
         spec = str(path)
         target = f"the clone at {path}"
     else:
-        release = normalize_version(version) if version is not None else latest_version(fetch=fetch)
+        if version is not None:
+            release = normalize_version(version)
+        else:
+            release = latest_version(fetch=fetch)
+            from_index = True
         spec = f"credux=={release}"
         target = release
 
     manager, command, venv = _installer(spec)
-    return UpgradePlan(manager=manager, target=target, command=command, venv=venv)
+    return UpgradePlan(
+        manager=manager,
+        target=target,
+        command=command,
+        venv=venv,
+        resolved_from_index=from_index,
+    )
+
+
+def _index_is_behind(plan: UpgradePlan, stderr: str) -> bool:
+    """True when the installer could not find the version the index just named.
+
+    Two sources answer the question "what is credux 0.3.0": the JSON document
+    `latest_version` reads, and the file listing the installer reads. Only a
+    disagreement between them is worth explaining - a version the *user* named
+    and the installer cannot find is a typo, and every other installer failure
+    speaks for itself.
+    """
+    return plan.resolved_from_index and bool(_VERSION_NOT_FOUND.search(stderr))
+
+
+def _failure_message(plan: UpgradePlan, returncode: int, stderr: str) -> str:
+    base = (
+        f"'{' '.join(plan.command)}' exited {returncode}; credux was not upgraded."
+    )
+    if not _index_is_behind(plan, stderr):
+        return base
+    return (
+        f"{base}\n\n"
+        f"The installer could not find credux {plan.target}, which the index "
+        f"named as the newest release moments ago. That contradiction is a "
+        f"cache, not a missing release: the install already bypasses pip's "
+        f"own copy of the index, so what is still catching up is PyPI's, "
+        f"which it serves with a ten-minute lifetime. The JSON document "
+        f"credux reads for the version number is refreshed sooner. Nothing "
+        f"has changed on this machine - wait a few minutes and run "
+        f"'credux upgrade' again."
+    )
 
 
 def apply(plan: UpgradePlan, runner=None) -> int:
@@ -214,9 +301,9 @@ def apply(plan: UpgradePlan, runner=None) -> int:
     if plan.venv is not None:
         _unlock(plan.venv)
     result = runner(plan.command)
+    # Already on screen: _run wrote each line through as it arrived. This copy
+    # is here to be read, not to be printed.
+    stderr = getattr(result, "stderr", "") or ""
     if result.returncode != 0:
-        raise UpgradeError(
-            f"'{' '.join(plan.command)}' exited {result.returncode}; credux was "
-            "not upgraded."
-        )
+        raise UpgradeError(_failure_message(plan, result.returncode, stderr))
     return result.returncode

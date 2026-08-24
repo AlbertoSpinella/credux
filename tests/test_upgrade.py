@@ -26,23 +26,24 @@ def test_the_install_spec_never_points_at_a_private_source(pipx_env, monkeypatch
 
 
 class FakeCompleted:
-    def __init__(self, returncode=0, stdout=""):
+    def __init__(self, returncode=0, stdout="", stderr=""):
         self.returncode = returncode
         self.stdout = stdout
-        self.stderr = ""
+        self.stderr = stderr
 
 
 class FakeRunner:
     """Stands in for subprocess.run and records what it was asked to do."""
 
-    def __init__(self, stdout="", returncode=0):
+    def __init__(self, stdout="", returncode=0, stderr=""):
         self.calls = []
         self.stdout = stdout
+        self.stderr = stderr
         self.returncode = returncode
 
     def __call__(self, command, **kwargs):
         self.calls.append(command)
-        return FakeCompleted(self.returncode, self.stdout)
+        return FakeCompleted(self.returncode, self.stdout, self.stderr)
 
 
 class FakeFetch:
@@ -92,6 +93,7 @@ def test_a_pipx_installation_is_upgraded_with_pipx(pipx_env, monkeypatch):
         "/usr/bin/pipx",
         "install",
         "--force",
+        "--pip-args=--no-cache-dir",
         "credux==0.2.0",
     ]
 
@@ -121,6 +123,7 @@ def test_a_plain_virtualenv_is_upgraded_with_its_own_pip(monkeypatch):
         "pip",
         "install",
         "--upgrade",
+        "--no-cache-dir",
         "credux==0.2.0",
     ]
 
@@ -154,7 +157,13 @@ def test_a_local_clone_is_installed_from_its_path(pipx_env, monkeypatch, tmp_pat
 
     plan = upgrade.plan(source=str(tmp_path))
 
-    assert plan.command == ["/usr/bin/pipx", "install", "--force", str(tmp_path)]
+    assert plan.command == [
+        "/usr/bin/pipx",
+        "install",
+        "--force",
+        "--pip-args=--no-cache-dir",
+        str(tmp_path),
+    ]
     assert str(tmp_path) in plan.target
 
 
@@ -268,3 +277,128 @@ def test_a_payload_naming_no_version_is_an_error() -> None:
 
     with pytest.raises(UpgradeError):
         upgrade.latest_version(fetch=fetch)
+
+
+# --- the installer must not be answered out of a stale index cache ----------
+#
+# `latest_version` reads PyPI's JSON document over urllib; the installer reads
+# the file listing through pip, which keeps its own copy for as long as PyPI's
+# ten-minute `cache-control` allows. Minutes after a release the two disagree,
+# and credux then asks pip for a version pip is convinced does not exist.
+
+
+def test_the_pipx_command_bypasses_pips_index_cache(pipx_env, monkeypatch):
+    monkeypatch.setattr(upgrade, "_which", lambda name: "/usr/bin/pipx")
+
+    plan = upgrade.plan(version="0.2.0")
+
+    assert "--pip-args=--no-cache-dir" in plan.command
+
+
+def test_the_pip_command_bypasses_pips_index_cache(monkeypatch):
+    monkeypatch.setattr(upgrade, "_is_editable", lambda: False)
+    monkeypatch.setattr(sys, "prefix", VENV_PREFIX)
+    monkeypatch.setattr(sys, "base_prefix", "/usr")
+
+    plan = upgrade.plan(version="0.2.0")
+
+    assert "--no-cache-dir" in plan.command
+
+
+def test_a_version_taken_from_the_index_is_recorded_as_such(pipx_env, monkeypatch):
+    monkeypatch.setattr(upgrade, "_which", lambda name: "/usr/bin/pipx")
+
+    plan = upgrade.plan(fetch=FakeFetch())
+
+    assert plan.resolved_from_index is True
+
+
+def test_a_version_the_user_named_is_not_recorded_as_the_index_answer(pipx_env, monkeypatch):
+    monkeypatch.setattr(upgrade, "_which", lambda name: "/usr/bin/pipx")
+
+    assert upgrade.plan(version="0.2.0").resolved_from_index is False
+
+
+def test_a_local_clone_is_not_recorded_as_the_index_answer(pipx_env, monkeypatch, tmp_path):
+    monkeypatch.setattr(upgrade, "_which", lambda name: "/usr/bin/pipx")
+
+    assert upgrade.plan(source=str(tmp_path)).resolved_from_index is False
+
+
+def test_the_installers_stderr_is_both_shown_and_kept(capfd):
+    """Teed, not captured.
+
+    `apply` reads stderr to tell one failure from another, but pipx writes its
+    whole commentary there: held back until the process exits, a minute-long
+    install would look hung. This is the one test that runs a real
+    subprocess - the buffering is the behaviour under test, and a fake runner
+    cannot exhibit it.
+    """
+    result = upgrade._run(
+        [sys.executable, "-c", "import sys; sys.stderr.write('installing\\n'); raise SystemExit(3)"]
+    )
+
+    assert result.returncode == 3
+    assert "installing" in result.stderr, "apply cannot read what was not kept"
+    assert "installing" in capfd.readouterr().err, "the user saw nothing"
+
+
+def test_a_version_the_index_named_but_the_installer_cannot_find_is_explained():
+    """The two sources disagreeing is a cache, not a missing release.
+
+    Raw, this reads as "0.10.0 does not exist" one line under credux saying it
+    does, and the user concludes the release is broken.
+    """
+    runner = FakeRunner(
+        returncode=1,
+        stderr="ERROR: No matching distribution found for credux==0.10.0\n",
+    )
+    plan = upgrade.UpgradePlan(
+        manager="pipx",
+        target="0.10.0",
+        command=["pipx", "install", "--force", "credux==0.10.0"],
+        resolved_from_index=True,
+    )
+
+    with pytest.raises(UpgradeError) as excinfo:
+        upgrade.apply(plan, runner=runner)
+
+    message = str(excinfo.value)
+    assert "0.10.0" in message
+    assert "cache" in message.lower()
+    assert "again" in message.lower()
+
+
+def test_a_version_the_user_named_is_not_blamed_on_the_index():
+    """`--version 9.9.9` for a release that never existed is a typo, not a lag."""
+    runner = FakeRunner(
+        returncode=1,
+        stderr="ERROR: No matching distribution found for credux==9.9.9\n",
+    )
+    plan = upgrade.UpgradePlan(
+        manager="pipx",
+        target="9.9.9",
+        command=["pipx", "install", "--force", "credux==9.9.9"],
+        resolved_from_index=False,
+    )
+
+    with pytest.raises(UpgradeError) as excinfo:
+        upgrade.apply(plan, runner=runner)
+
+    assert "cache" not in str(excinfo.value).lower()
+
+
+def test_a_failure_that_is_not_about_a_missing_version_is_left_alone():
+    """A read-only venv, a locked exe: the installer's own error is the answer."""
+    runner = FakeRunner(returncode=1, stderr="ERROR: Permission denied\n")
+    plan = upgrade.UpgradePlan(
+        manager="pipx",
+        target="0.10.0",
+        command=["pipx", "install", "--force", "credux==0.10.0"],
+        resolved_from_index=True,
+    )
+
+    with pytest.raises(UpgradeError) as excinfo:
+        upgrade.apply(plan, runner=runner)
+
+    assert "cache" not in str(excinfo.value).lower()

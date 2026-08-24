@@ -73,6 +73,22 @@ template. Add a distinguishing variable such as `{account_id}`, or re-run with
 Center. See
 [configuration.md](configuration.md#re-templating-an-existing-credential).
 
+## `credux upgrade` cannot find the version it just announced
+
+```
+Upgrading credux to 0.3.0 with pipx
+ERROR: No matching distribution found for credux==0.3.0
+```
+
+The release exists. The version number and the files come from two different
+places - a JSON document credux reads directly, and the file listing the
+installer reads through pip - and PyPI serves the listing with a ten-minute
+cache, so for the first minutes after a release the second one has not caught
+up. Nothing on this machine has changed and nothing is broken: wait a few
+minutes and run it again. Credux recognises this case and says so rather than
+passing pip's message through. See
+[releasing.md](releasing.md#how-credux-upgrade-works).
+
 ## Exit codes
 
 Read directly off the error that was raised.

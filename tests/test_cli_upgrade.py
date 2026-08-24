@@ -1,4 +1,3 @@
-import subprocess
 import sys
 
 import pytest
@@ -41,7 +40,10 @@ def calls(credux_home, monkeypatch):
         recorded.append(command)
         return FakeCompleted(returncode=0)
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    # `_run`, not `subprocess.run`: the real one drives Popen and tees the
+    # installer's stderr line by line, which is behaviour of its own and is
+    # tested where it lives, in tests/test_upgrade.py.
+    monkeypatch.setattr(upgrade, "_run", fake_run)
     # Resolution is a request to the index now, not a subprocess, so it is
     # stubbed separately and never shows up in `recorded`.
     monkeypatch.setattr(upgrade, "_fetch_json", lambda url: {"info": {"version": "0.2.0"}})
@@ -56,6 +58,7 @@ def test_upgrade_installs_the_newest_release(calls):
         "/usr/bin/pipx",
         "install",
         "--force",
+        "--pip-args=--no-cache-dir",
         "credux==0.2.0",
     ]
     assert "0.2.0" in result.stdout
@@ -79,11 +82,13 @@ def test_an_explicit_version_is_installed_even_if_it_is_the_current_one(calls, m
 
     assert result.exit_code == 0, result.output
     # No index lookup is needed when the version is spelled out.
-    assert calls == [["/usr/bin/pipx", "install", "--force", "credux==0.2.0"]]
+    assert calls == [
+        ["/usr/bin/pipx", "install", "--force", "--pip-args=--no-cache-dir", "credux==0.2.0"]
+    ]
 
 
 def test_a_failing_installer_exits_with_the_upgrade_error_code(calls, monkeypatch):
-    monkeypatch.setattr(subprocess, "run", lambda command, **kw: FakeCompleted(returncode=1))
+    monkeypatch.setattr(upgrade, "_run", lambda command, **kw: FakeCompleted(returncode=1))
 
     result = make_runner().invoke(cli, ["upgrade", "--version", "0.2.0"])
 

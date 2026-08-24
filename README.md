@@ -1,5 +1,9 @@
 # credux
 
+[![PyPI](https://img.shields.io/pypi/v/credux.svg)](https://pypi.org/project/credux/)
+[![Python versions](https://img.shields.io/pypi/pyversions/credux.svg)](https://pypi.org/project/credux/)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+
 Credux manages your AWS credentials and materializes the ones you are actively
 using into `~/.aws/credentials` and `~/.aws/config`, under profile names it
 derives from a template you control.
@@ -84,7 +88,8 @@ credux console acme-billing-User-ada   # open the account in a browser container
 `credux start` writes the profile into `~/.aws/credentials`, so any tool that
 reads a profile can use it right away. `credux shell-init` installs the `pu`
 shell function (which sets `AWS_PROFILE` in your current shell) and registers tab
-completion for bash, zsh, and fish.
+completion for bash, zsh, and fish - for the `credux` commands and for `pu`
+itself, so `pu mana<TAB>` offers the profiles that match.
 
 Profile names are searched, not spelled out: `credux console billing` finds
 `acme-billing-User-ada`, and an ambiguous term asks which one you meant.
@@ -100,6 +105,40 @@ credux sync acme      # discovers accounts/roles, creates/renames profiles
 
 Then `credux list` shows everything configured, which sessions are active, and
 how long each has left.
+
+## How credux compares
+
+Credux is not the only tool in this space, and the honest summary is that the
+overlap is large. What differs is the centre of gravity.
+
+| | credux | [aws-vault](https://github.com/byteness/aws-vault) | [granted](https://github.com/common-fate/granted) | [aws-sso-util](https://github.com/benkehoe/aws-sso-util) |
+|---|---|---|---|---|
+| IAM user access keys in the OS keychain | yes | yes | not its focus | no |
+| Roles assumed on demand, chained through another stored credential | yes | yes | roles yes | no |
+| Identity Center: discovers accounts and permission sets, generates profiles | yes | no | yes | yes |
+| How other tools get the credentials | profiles in `~/.aws/credentials`, written while the session is active | subprocess environment, or a local metadata server (`exec --server`) | shell environment, `credential_process`, or an export to the credentials file | `credential_process` |
+| Profile names from a template you own | yes | you write the profiles | partly | yes |
+| AWS console in a browser | yes | yes | yes | no |
+| Firefox multi-account containers | yes | no | yes | no |
+| A `default` profile pinned to invalid keys, so a forgotten profile fails loudly | yes | no | no | no |
+| Preserves your existing `~/.aws` files byte for byte, with a one-time backup | yes | n/a | n/a | partly |
+| Install | `pipx install credux` | Go binary | Go binary | `pipx install aws-sso-util` |
+
+Two things worth saying plainly:
+
+- **The credentials file is a trade, not an oversight.** Credux puts real keys
+  for active sessions on disk so that every tool reading `AWS_PROFILE` works
+  with no wrapper and no re-launch. If your threat model rules that out,
+  aws-vault is the better fit and
+  [docs/security.md](docs/security.md#why-a-credentials-file-and-not-a-wrapper)
+  argues the case in full rather than hiding it.
+- **The upstream `99designs/aws-vault` is no longer maintained.** The link
+  above points at the fork that is.
+
+Credux earns its place when you hold all three credential kinds at once - a
+legacy IAM user here, a chain of assumed roles there, an Identity Center tenant
+with thirty accounts - and want one naming scheme, one list, and one command
+over the lot.
 
 ## Profile names are a template you own
 
@@ -149,14 +188,16 @@ Disable it with `credux config set default_profile.enabled false`. If you had a
 | [docs/security.md](docs/security.md) | Where secrets live and where they never go, file permissions, the one-time backup. |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | `credux doctor`, keychain on headless Linux and WSL, exit codes. |
 | [docs/architecture.md](docs/architecture.md) | For contributors: the layering rule, the invariants, the module map. |
+| [CHANGELOG.md](CHANGELOG.md) | What changed in every release, and how to upgrade across them. |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How a change reaches a release, what a good issue contains, and what never belongs in one. |
 
 `examples/config.json` is a complete configuration file to read alongside
 [docs/configuration.md](docs/configuration.md).
 
 ## Contributing
 
-Issues and pull requests are welcome. The project follows strict test-driven
-development.
+Issues and pull requests are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) has
+the detail. The project follows strict test-driven development.
 
 Development happens in a separate tree, and what arrives here is the released
 state: one commit per release, which is why the history is short and every

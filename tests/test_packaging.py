@@ -22,6 +22,8 @@ ALLOWED_PREFIXES = (
     "examples/",
     ".github/",
     "README.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
     "LICENSE",
     "pyproject.toml",
     ".gitignore",

@@ -9,7 +9,7 @@ it, and a quickstart.
 |---|---|
 | [usage.md](usage.md) | Command reference, profile searching, `pu` and tab completion, Identity Center, running several sessions at once, scheduled refresh, the AWS console and browser containers. |
 | [configuration.md](configuration.md) | Every key in `config.json`: `settings`, naming templates and the management-account prefix, `sso_sessions`, `integrations`, `post_sync`. |
-| [security.md](security.md) | Where secrets live and where they never go, file permissions, the one-time backup, the console-URL caveat. |
+| [security.md](security.md) | Why credux writes a credentials file rather than wrapping your commands, where secrets live and where they never go, file permissions, the one-time backup, the console-URL caveat. |
 | [troubleshooting.md](troubleshooting.md) | `credux doctor`, keychain on headless Linux and WSL, common failures, the exit-code table. |
 
 ## Working on credux
@@ -20,6 +20,8 @@ it, and a quickstart.
 | [providers.md](providers.md) | How to add a provider for another cloud. |
 | [testing.md](testing.md) | How to run the suite, the test conventions, and the traps this project has actually hit. |
 | [releasing.md](releasing.md) | Cutting a release and how `credux upgrade` decides what to do. |
+| [../CONTRIBUTING.md](../CONTRIBUTING.md) | How a proposed change reaches a release, and what a useful issue looks like. |
+| [../CHANGELOG.md](../CHANGELOG.md) | What changed in every release. |
 
 Read [architecture.md](architecture.md) before changing structure and
 [testing.md](testing.md) before writing tests.

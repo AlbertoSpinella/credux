@@ -6,6 +6,7 @@ import json
 
 import pytest
 from click.shell_completion import ShellComplete
+from click.testing import CliRunner
 
 from credux import completion
 from credux.cli import cli
@@ -149,3 +150,80 @@ def test_completion_offers_nothing_when_the_config_is_unreadable(credux_home):
 
 def test_completion_offers_nothing_when_there_is_no_config_at_all(credux_home):
     assert complete(["start"], "acme") == []
+
+
+# --- the 'completions' command behind the pu wrapper ------------------------
+#
+# `pu` is a shell function, so Click's generated script - which registers
+# itself against the `credux` command only - never sees it. Its completer
+# calls this command instead, and offers whatever it prints.
+
+
+def make_runner() -> CliRunner:
+    """Keep stdout and stderr separate; click >= 8.2 does that unconditionally."""
+    try:
+        return CliRunner(mix_stderr=False)
+    except TypeError:
+        return CliRunner()
+
+
+def offer(incomplete: str) -> list[str]:
+    result = make_runner().invoke(cli, ["completions", "profiles", incomplete])
+    return result.stdout.splitlines()
+
+
+def test_completions_profiles_prints_matching_names_one_per_line(credux_home):
+    write_config(
+        credux_home,
+        [credential("acme-billing-User-ada"), credential("acme-dev-User-bob")],
+    )
+
+    result = make_runner().invoke(cli, ["completions", "profiles", "acme"])
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout.splitlines() == ["acme-billing-User-ada", "acme-dev-User-bob"]
+
+
+def test_completions_profiles_lists_every_profile_with_no_prefix(credux_home):
+    write_config(
+        credux_home,
+        [credential("acme-billing-User-ada"), credential("beta-dev-User-bob")],
+    )
+
+    assert offer("") == ["acme-billing-User-ada", "beta-dev-User-bob"]
+
+
+@pytest.mark.parametrize("incomplete", ["", "billing", "BILLING", "acme", "nope"])
+def test_completions_profiles_offers_exactly_what_credux_env_offers(credux_home, incomplete):
+    """The point of the command: `pu <TAB>` and `credux env <TAB>` must offer
+    the same set, so one completer cannot drift from the other."""
+    write_config(
+        credux_home,
+        [credential("acme-billing-User-ada"), credential("beta-dev-User-bob")],
+    )
+
+    assert offer(incomplete) == complete(["env"], incomplete)
+
+
+def test_completions_profiles_prints_nothing_when_the_config_is_unreadable(credux_home):
+    """A broken config must not put a traceback or a half-line on stdout: the
+    shell would offer it as a candidate. The group callback loads the config
+    eagerly and so still fails here, which is why the completers discard both
+    stderr and the exit status - stdout is the whole contract."""
+    (credux_home / "config.json").write_text("{not json", encoding="utf-8")
+
+    result = make_runner().invoke(cli, ["completions", "profiles", "acme"])
+
+    assert result.stdout == ""
+
+
+def test_completions_profiles_prints_nothing_when_there_is_no_config(credux_home):
+    assert offer("acme") == []
+
+
+def test_completions_is_hidden_from_the_help(credux_home):
+    """Plumbing for the shell, not a command to reach for by hand."""
+    result = make_runner().invoke(cli, ["--help"])
+
+    assert result.exit_code == 0, result.output
+    assert "completions" not in result.output

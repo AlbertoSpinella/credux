@@ -862,7 +862,8 @@ def shell_init(ctx, shell_name):
     Add 'eval "$(credux shell-init)"' to your shell rc, then use 'pu <profile>'
     to switch the current shell's AWS_PROFILE and 'pu' with no argument to
     unset it. The same output registers tab completion for credux's
-    subcommands, profile names, and Identity Center session names.
+    subcommands, profile names, and Identity Center session names, and for
+    'pu' itself.
     """
     shell = shell_name or shellenv.detect_shell()
     filename = SHELL_FILES.get(shell)
@@ -882,6 +883,30 @@ def shell_init(ctx, shell_name):
         script = completion.source(shell, cli)
         if script:
             click.echo(script)
+
+
+@cli.group("completions", cls=CreduxGroup, hidden=True)
+def completions_group() -> None:
+    """Candidate lists for shell completers that Click's script cannot serve."""
+
+
+@completions_group.command("profiles")
+@click.argument("incomplete", required=False, default="")
+def completions_profiles(incomplete: str) -> None:
+    """Print the profile names matching INCOMPLETE, one per line.
+
+    `pu` is a shell function, so Click's generated script - which registers
+    itself against the `credux` command alone - never completes it. Its
+    completer calls this instead, and it deliberately goes through the same
+    completer `credux env <TAB>` uses so the two offer the same set.
+
+    Only stdout is the contract: the group callback loads the config eagerly,
+    so an unreadable one still fails here, and the shell completers discard
+    both stderr and the exit status rather than offer an error message as a
+    candidate.
+    """
+    for name in completion.complete_profiles(None, None, incomplete):
+        click.echo(name)
 
 
 @cli.command("console")

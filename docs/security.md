@@ -1,5 +1,56 @@
 # Security model
 
+## Why a credentials file, and not a wrapper
+
+The tools credux is usually compared to keep secret material off disk. `aws-vault
+exec` holds the keys in the keychain and injects them as environment variables
+into one child process; a `credential_process` entry in `~/.aws/config` has the
+SDK call a helper and read the keys from its stdout. Credux instead writes the
+active session into `~/.aws/credentials`. That is a deliberate trade, and this
+is the whole of it.
+
+**What the file buys.** Every tool that reads a profile works, with no
+per-tool integration and no re-launch: Terraform and its providers, boto3 in a
+notebook you started an hour ago, k9s, an IDE's AWS plugin, a GUI client, a
+`Makefile` target, a container that bind-mounts `~/.aws`, a script a colleague
+sent you. A wrapper covers only the process it spawns, so anything long-running
+or started outside it - the editor, the notebook kernel, the daemon - is not
+covered by it. `credential_process` covers more than a wrapper does, at the
+cost of invoking a helper on every SDK initialisation: keychain prompts arrive
+at unpredictable moments, a truncated `PATH` (IDEs, cron, containers) breaks it
+in ways whose error text names the SDK rather than the cause, and you still end
+up editing `~/.aws/config` to declare it.
+
+**What the file costs.** The keys for *active* sessions are readable by anything
+that can read a file owned by your user. That is a real cost, and it is not the
+same as "no worse than a wrapper":
+
+- Backup and sync software picks the file up. A home directory in Dropbox,
+  rclone, Time Machine, or a `tar` of `$HOME` now carries live credentials.
+- Container bind-mounts of `~/.aws` hand the file to whatever runs inside.
+- The exposure lasts as long as the session, not as long as one command.
+
+Some of the gap is narrower than it looks. On Linux, any process running as you
+can read `/proc/<pid>/environ` of a wrapper's child, and can read the keychain
+through the same Secret Service API credux and aws-vault both use once the
+keychain is unlocked. An attacker already executing code as your user is in a
+strong position against every tool in this category. The difference is exposure
+at rest and to software that was never attacking you.
+
+**What credux does about the cost.** Only active sessions are written - an IAM
+user's long-term keys reach the file only while a session using them is started,
+and `credux stop` removes them. Identity Center and role sessions carry an
+expiry and stop working on their own. The files are written atomically at
+`0600`, and `credux doctor` reports looser permissions. Long-term secrets never
+leave the keychain: what lands on disk for a role or an Identity Center
+permission set is a temporary session token, not the credential that minted it.
+
+**Use something else if** your threat model includes other local users, malware
+running as you reading files at rest, or a policy that forbids plaintext
+credentials on disk at all. `aws-vault` is the better fit for that, and credux
+will not talk you out of it. Credux is built for the case where the machine is
+trusted and the friction of a wrapper is the thing actually costing you.
+
 ## Where secrets live
 
 **Long-term secrets live in the OS keychain only**, accessed through the

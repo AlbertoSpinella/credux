@@ -107,10 +107,19 @@ session names from your config. Profile completion matches the same way the
 commands themselves do - substring, case insensitive - so anything offered is
 something the command will accept.
 
-Completion is available for bash, zsh, and fish. The `posix` wrapper serves both
-bash and zsh, and their completion scripts are not interchangeable, so it carries
-both and picks the right one when your shell starts. There is no PowerShell
-completion; `credux shell-init --shell powershell` prints the `pu` wrapper alone.
+`pu` completes profile names too: `pu mana<TAB>` offers every profile whose name
+contains `mana`, the same set `pu mana<Enter>` would have searched. Because `pu`
+is a shell function rather than a command, the shell cannot learn about it from
+credux's own completion script, so each wrapper registers a completer that asks
+`credux completions profiles` for the candidates - one list, so `pu <TAB>` and
+`credux env <TAB>` can never drift apart.
+
+Completion is available for bash, zsh, and fish, and `pu` completion also works
+in PowerShell. The `posix` wrapper serves both bash and zsh, and their
+completion scripts are not interchangeable, so it carries both and picks the
+right one when your shell starts. There is no PowerShell completion for the
+`credux` command itself; `credux shell-init --shell powershell` prints the `pu`
+wrapper and its completer.
 
 If completion does not appear, the usual causes are a shell that has not re-read
 its startup file (open a new one) or a stale command hash from before credux was

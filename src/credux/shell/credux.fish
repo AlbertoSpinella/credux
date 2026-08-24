@@ -20,3 +20,8 @@ function pu
   end
   printf '%s\n' $credux_statement | source
 end
+
+# Tab completion for `pu`: the Click-generated script completes the `credux`
+# command alone, so the wrapper function needs its own. Asking credux for the
+# candidates is what makes `pu <TAB>` offer what `credux env <TAB>` offers.
+complete --no-files --command pu --arguments "(credux completions profiles (commandline -t))"

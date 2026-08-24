@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" font-family="DejaVu Sans, Helvetica, Arial, sans-serif">
+  <rect width="1280" height="640" fill="#11131a"/>
+  <rect x="0" y="0" width="1280" height="8" fill="#f0a24b"/>
+
+  <text x="80" y="150" fill="#f5f6f8" font-size="86" font-weight="700" letter-spacing="-2">credux</text>
+  <text x="80" y="208" fill="#f0a24b" font-size="30" font-weight="600">One CLI for every AWS credential you hold</text>
+
+  <text x="80" y="272" fill="#9aa3b2" font-size="25">IAM users &#183; assumed roles &#183; Identity Center</text>
+  <text x="80" y="312" fill="#9aa3b2" font-size="25">Materialized into real profiles. No wrapper, no credential_process.</text>
+
+  <rect x="80" y="366" width="1120" height="180" rx="12" fill="#1b1f2a" stroke="#2c3242" stroke-width="2"/>
+  <circle cx="112" cy="398" r="7" fill="#ff5f56"/>
+  <circle cx="136" cy="398" r="7" fill="#ffbd2e"/>
+  <circle cx="160" cy="398" r="7" fill="#27c93f"/>
+  <text x="112" y="458" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="25" fill="#7fd1a0">$ <tspan fill="#e6e9ef">credux start acme-billing-User-ada</tspan></text>
+  <text x="112" y="498" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace" font-size="25" fill="#7fd1a0">$ <tspan fill="#e6e9ef">terraform plan</tspan>   <tspan fill="#6b7383"># it just works</tspan></text>
+
+  <text x="80" y="592" fill="#6b7383" font-size="22" font-family="DejaVu Sans Mono, Menlo, Consolas, monospace">pipx install credux</text>
+  <text x="1200" y="592" fill="#6b7383" font-size="22" text-anchor="end">github.com/AlbertoSpinella/credux</text>
+</svg>

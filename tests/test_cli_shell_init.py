@@ -225,3 +225,149 @@ def test_the_powershell_shell_init_output_is_wrapper_only(credux_home):
 
     assert "function pu" in source
     assert "_CREDUX_COMPLETE" not in source
+
+
+# --- tab completion for `pu` ------------------------------------------------
+#
+# `pu` is a shell function, so Click's generated script - which registers
+# itself against the `credux` command alone - never completes it. Each
+# wrapper registers its own completer, which asks `credux completions
+# profiles` for the candidates so `pu <TAB>` offers exactly what
+# `credux env <TAB>` offers.
+
+
+def stub_completions(directory, names) -> None:
+    """A fake `credux` that answers `completions profiles` and records its argv.
+
+    Also writes to stderr, because the completer must discard that: a
+    diagnostic offered as a completion candidate would be inserted into the
+    user's command line.
+    """
+    script = directory / "credux"
+    body = "".join(f'printf "%s\\n" {name!r}\n' for name in names)
+    script.write_text(
+        "#!/bin/sh\n"
+        f'printf "%s\\n" "$@" > {directory}/argv\n'
+        'echo "credux: boom" >&2\n'
+        f"{body}"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    os.chmod(script, 0o755)
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+def test_bash_registers_a_completer_for_pu(credux_home, tmp_path):
+    script = tmp_path / "init.sh"
+    script.write_text(f"{wrapper_source('posix')}\ncomplete -p pu\n", encoding="utf-8")
+
+    result = subprocess.run(["bash", str(script)], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    assert "-F _credux_pu_completion_bash pu" in result.stdout
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+def test_the_bash_pu_completer_offers_the_names_credux_prints(credux_home, tmp_path):
+    stub_completions(tmp_path, ["acme-billing-User-ada", "beta-billing-User-bob"])
+    script = tmp_path / "init.sh"
+    script.write_text(
+        f"{wrapper_source('posix')}\n"
+        "COMP_WORDS=(pu billing)\n"
+        "COMP_CWORD=1\n"
+        "_credux_pu_completion_bash\n"
+        'printf "reply:%s\\n" "${COMPREPLY[@]}"\n',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        ["bash", str(script)],
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "reply:acme-billing-User-ada" in result.stdout
+    assert "reply:beta-billing-User-bob" in result.stdout
+    # The completer redirects stderr away; a candidate made of credux's own
+    # diagnostics would be inserted into the command line on TAB.
+    assert "boom" not in result.stdout
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+def test_the_bash_pu_completer_forwards_the_word_being_typed(credux_home, tmp_path):
+    """Without the current word, `pu mana<TAB>` would offer every profile."""
+    stub_completions(tmp_path, ["acme-billing-User-ada"])
+    script = tmp_path / "init.sh"
+    script.write_text(
+        f"{wrapper_source('posix')}\n"
+        "COMP_WORDS=(pu billing)\n"
+        "COMP_CWORD=1\n"
+        "_credux_pu_completion_bash\n",
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        ["bash", str(script)],
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+    )
+
+    argv = (tmp_path / "argv").read_text(encoding="utf-8").split()
+    assert argv == ["completions", "profiles", "billing"]
+
+
+@pytest.mark.skipif(shutil.which("zsh") is None, reason="needs zsh")
+def test_zsh_registers_a_completer_for_pu(credux_home, tmp_path):
+    script = tmp_path / "init.zsh"
+    script.write_text(
+        f"autoload -Uz compinit && compinit -u -d {tmp_path}/zcompdump\n"
+        f"{wrapper_source('posix')}\n"
+        'print -r -- "registered:${_comps[pu]}"\n',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(["zsh", str(script)], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    assert "registered:_credux_pu_completion_zsh" in result.stdout
+
+
+def test_the_zsh_pu_completer_does_not_filter_out_substring_matches(credux_home):
+    """`compadd -U` is what makes `pu mana<TAB>` able to offer
+    `prod-management`: without it zsh drops every candidate that does not
+    start with the word already typed, and the substring matching that
+    `credux env` does would be invisible."""
+    source = wrapper_source("posix")
+    # Split on the closing brace on its own line: the body itself contains
+    # braces, in "${words[CURRENT]}".
+    body = source.split("_credux_pu_completion_zsh()", 1)[1].split("\n}\n", 1)[0]
+
+    assert "compadd -U" in body
+
+
+def test_the_fish_wrapper_completes_pu_from_credux(credux_home):
+    source = wrapper_source("fish")
+
+    assert "--command pu" in source
+    assert "credux completions profiles" in source
+
+
+def test_the_powershell_wrapper_completes_pu_from_credux(credux_home):
+    source = wrapper_source("powershell")
+
+    assert "Register-ArgumentCompleter -CommandName pu -ParameterName Name" in source
+    assert "credux completions profiles" in source
+
+
+def test_the_zsh_pu_completer_keeps_the_typed_word_when_several_names_match(credux_home):
+    """`compadd -U` also makes zsh replace the typed word with the matches'
+    common prefix, and for substring matches that is usually empty: on
+    `pu mana<TAB>` zsh would erase "mana" and offer nothing at all. Cycling
+    through the matches instead keeps the line intact until one is chosen."""
+    source = wrapper_source("posix")
+    body = source.split("_credux_pu_completion_zsh()", 1)[1].split("\n}\n", 1)[0]
+
+    assert "compstate[insert]=menu" in body

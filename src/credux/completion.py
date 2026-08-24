@@ -7,6 +7,7 @@ cloud any of them belongs to.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Iterable
 
 import click
@@ -25,6 +26,8 @@ PROGRAM_NAME = "credux"
 
 HEREDOC_DELIMITER = "CREDUX_COMPLETION_SCRIPT"
 
+SHELL_DIR = Path(__file__).parent / "shell"
+
 
 def source(shell: str, command: click.Command) -> str:
     """Click's completion script for `shell`, or "" if Click has none.
@@ -39,6 +42,17 @@ def source(shell: str, command: click.Command) -> str:
     return completion_class(command, {}, PROGRAM_NAME, COMPLETE_VAR).source()
 
 
+def pu_completion(shell: str) -> str:
+    """The completer for the `pu` shell function, for bash or zsh.
+
+    Click's script registers itself against the `credux` command alone, so
+    `pu` - a shell function the CLI never sees - needs a completer of its own.
+    It lives here rather than in `credux.sh` so that the wrapper file stays
+    parseable by any POSIX shell: these two bodies are bash- and zsh-only.
+    """
+    return (SHELL_DIR / f"pu.{shell}").read_text(encoding="utf-8")
+
+
 def _heredoc(name: str, shell: str, command: click.Command) -> str:
     """One shell script carried as data rather than as code.
 
@@ -47,8 +61,11 @@ def _heredoc(name: str, shell: str, command: click.Command) -> str:
     bash: the two scripts are not mutually parseable, and bash's failure on
     zsh's `for type key descr in ...` happens at parse time, so no runtime
     `if` around it would help.
+
+    The `pu` completer rides along in the same heredoc: it has the same
+    parseability problem and the same one of the two shells to be eval'd in.
     """
-    script = source(shell, command)
+    script = source(shell, command) + pu_completion(shell)
     delimiter = HEREDOC_DELIMITER
     if any(line.strip() == delimiter for line in script.splitlines()):
         # Unreachable with Click's own scripts, and deliberately fatal rather

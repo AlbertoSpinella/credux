@@ -177,6 +177,18 @@ so the group callback has not run and there is no `App` on the context. It loads
 traceback would be printed over the user's prompt line at the moment they
 pressed TAB.
 
+Completing `pu` is a third constraint. It is a shell function, so Click's
+script - which registers itself against the `credux` command alone - never sees
+it, and each wrapper carries a completer of its own. Those completers ask the
+hidden `credux completions profiles` command, which calls the same
+`complete_profiles` the `credux env` argument uses, so the two lists cannot
+drift. The bash and zsh completers live in `shell/pu.bash` and `shell/pu.zsh`
+rather than in `credux.sh`: they ride the same quoted heredoc as Click's
+scripts, which keeps `credux.sh` parseable by any POSIX shell. They read only
+stdout and discard stderr and the exit status - the group callback loads the
+config eagerly, so a broken one still fails, and a diagnostic offered as a
+candidate would be inserted into the command line on TAB.
+
 **`upgrade.py`.** Planning (`plan`) is separated from mutation (`apply`) the
 same way `sync.py` separates them. It refuses an editable install and a non-venv
 install rather than writing over either. The CLI command prints nothing computed

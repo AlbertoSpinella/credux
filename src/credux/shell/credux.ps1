@@ -16,10 +16,11 @@ function cdx {
   $statement | Invoke-Expression
 }
 
-# Tab completion for `cdx`. Click ships no PowerShell backend, so this is the
-# only completion credux registers here. -ParameterName is required for a
-# PowerShell function: without it the completer is only consulted for native
-# commands, which `cdx` is not.
+# Tab completion for `cdx`. Completion for `credux` itself is a separate
+# block, appended by `shell-init` from credux's own Click backend: `cdx` is a
+# shell function Click never sees. -ParameterName is required for a PowerShell
+# function: without it the completer is only consulted for native commands,
+# which `cdx` is not.
 Register-ArgumentCompleter -CommandName cdx -ParameterName Name -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
   # Only stdout is used: credux writes its diagnostics to stderr, and one

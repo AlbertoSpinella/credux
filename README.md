@@ -88,8 +88,8 @@ credux console acme-billing-User-ada   # open the account in a browser container
 `credux start` writes the profile into `~/.aws/credentials`, so any tool that
 reads a profile can use it right away. `credux shell-init` installs the `cdx`
 shell function (which sets `AWS_PROFILE` in your current shell) and registers
-tab completion for bash, zsh, and fish - for the `credux` commands and for
-`cdx` itself, so `cdx mana<TAB>` offers the profiles that match.
+tab completion for bash, zsh, fish, and PowerShell - for the `credux` commands
+and for `cdx` itself, so `cdx mana<TAB>` offers the profiles that match.
 
 Profile names are searched, not spelled out: `credux console billing` finds
 `acme-billing-User-ada`, and an ambiguous term asks which one you meant.

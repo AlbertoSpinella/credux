@@ -218,13 +218,14 @@ def test_the_fish_shell_init_output_includes_the_fish_completion(credux_home):
     assert "complete --no-files --command credux" in source
 
 
-def test_the_powershell_shell_init_output_is_wrapper_only(credux_home):
-    """Click has no PowerShell completion backend, so shell-init must print
-    the wrapper alone rather than an empty or half-written block."""
+def test_the_powershell_shell_init_output_includes_the_credux_completion(credux_home):
+    """credux registers its own Click completion class for PowerShell, so
+    shell-init emits a completer for `credux` itself and not only for `cdx`."""
     source = wrapper_source("powershell")
 
     assert "function cdx" in source
-    assert "_CREDUX_COMPLETE" not in source
+    assert "Register-ArgumentCompleter -Native -CommandName credux" in source
+    assert "_CREDUX_COMPLETE" in source
 
 
 # --- tab completion for `cdx` ------------------------------------------------

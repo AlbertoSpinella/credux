@@ -163,7 +163,7 @@ which needs no credential: it is what `credux config set naming.<key>` calls
 before storing a template, so a bad one is refused when it is typed rather than
 when it would first have failed to name something.
 
-**`completion.py`.** Two things constrain it. First, bash's and zsh's completion
+**`completion.py`.** Three things constrain it. First, bash's and zsh's completion
 scripts are not mutually parseable (bash fails on zsh's `for type key descr in
 ...` at *parse* time, so an `if [ -n "$ZSH_VERSION" ]` guard around both would
 not help: bash parses the whole compound command before running any of it), and
@@ -177,7 +177,18 @@ so the group callback has not run and there is no `App` on the context. It loads
 traceback would be printed over the user's prompt line at the moment they
 pressed TAB.
 
-Completing `cdx` is a third constraint. It is a shell function, so Click's
+Third, Click ships completion backends for bash, zsh and fish only, and what it
+is missing for PowerShell is the *script*, not the mechanism: the protocol is
+two environment variables in and one line per candidate out. So `completion.py`
+registers a `PowerShellComplete` with `click.shell_completion.add_completion_class`
+rather than special-casing PowerShell in `shell-init`, and everything above it -
+`source()`, the `_CREDUX_COMPLETE` dispatch in the installed binary - serves it
+through Click's own machinery unchanged. Its answer is tab-separated, one
+candidate per line, because that is what PowerShell can split without a parser,
+so `format_completion` strips both characters out of every field. `cmd` still has
+no backend, and `source()` returning `""` for it is the case that stays.
+
+Completing `cdx` is a fourth constraint. It is a shell function, so Click's
 script - which registers itself against the `credux` command alone - never sees
 it, and each wrapper carries a completer of its own. Those completers ask the
 hidden `credux completions profiles` command, which calls the same

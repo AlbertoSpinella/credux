@@ -44,6 +44,11 @@ Usually one of two things: a shell that has not re-read its startup file (open a
 new one), or a stale command hash from before credux was installed (`hash -r` in
 bash, `rehash` in zsh). See [usage.md](usage.md#tab-completion).
 
+On Windows PowerShell 5.1 there is one case that is not fixable from credux's
+side: it does not consult a completer while the token under the cursor is a bare
+`-` or `--`. Type one more character (`credux env --s<TAB>`), or use
+PowerShell 7.
+
 ## A profile you just started is missing
 
 Credux takes no lock on the files it writes, so a scheduled `credux refresh

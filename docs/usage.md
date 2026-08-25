@@ -114,12 +114,15 @@ about it from credux's own completion script, so each wrapper registers a
 completer that asks `credux completions profiles` for the candidates - one
 list, so `cdx <TAB>` and `credux env <TAB>` can never drift apart.
 
-Completion is available for bash, zsh, and fish, and `cdx` completion also works
-in PowerShell. The `posix` wrapper serves both bash and zsh, and their
-completion scripts are not interchangeable, so it carries both and picks the
-right one when your shell starts. There is no PowerShell completion for the
-`credux` command itself; `credux shell-init --shell powershell` prints the `cdx`
-wrapper and its completer.
+Completion is available for bash, zsh, fish, and PowerShell, for both `credux`
+and `cdx`. The `posix` wrapper serves both bash and zsh, and their completion
+scripts are not interchangeable, so it carries both and picks the right one when
+your shell starts. Click ships no PowerShell completion script, so credux
+supplies its own backend for it; the one gap is Windows PowerShell 5.1, which
+does not consult a completer while the token under the cursor is a bare `-` or
+`--`, so `credux env --<TAB>` offers nothing there while `credux env --s<TAB>`
+completes to `--shell`. PowerShell 7 has no such gap. `cmd` has neither a
+wrapper nor completion.
 
 If completion does not appear, the usual causes are a shell that has not re-read
 its startup file (open a new one) or a stale command hash from before credux was

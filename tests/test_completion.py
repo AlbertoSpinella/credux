@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from click.shell_completion import ShellComplete
+from click.shell_completion import CompletionItem, ShellComplete, get_completion_class
 from click.testing import CliRunner
 
 from credux import completion
@@ -50,7 +50,7 @@ def complete(args: list[str], incomplete: str) -> list[str]:
 # --- the completion scripts -------------------------------------------------
 
 
-@pytest.mark.parametrize("shell", ["bash", "zsh", "fish"])
+@pytest.mark.parametrize("shell", ["bash", "zsh", "fish", "powershell"])
 def test_source_is_clicks_script_for_a_supported_shell(shell):
     script = completion.source(shell, cli)
 
@@ -58,12 +58,64 @@ def test_source_is_clicks_script_for_a_supported_shell(shell):
     assert "credux" in script
 
 
-@pytest.mark.parametrize("shell", ["powershell", "cmd"])
-def test_source_is_empty_for_a_shell_click_cannot_complete(shell):
-    """Click ships no completion backend for these. An empty string, not a
-    crash: `credux shell-init --shell powershell` must still print its
+def test_source_is_empty_for_a_shell_nothing_can_complete():
+    """No backend for `cmd`, Click's or credux's. An empty string, not a
+    crash: a shell with a wrapper but no completion must still get the
     wrapper."""
-    assert completion.source(shell, cli) == ""
+    assert completion.source("cmd", cli) == ""
+
+
+def test_powershell_is_registered_as_a_click_completion_class():
+    """Registering the class rather than special-casing PowerShell in
+    `shell-init` is what makes `source()` and the `_CREDUX_COMPLETE`
+    protocol serve it through Click's own machinery."""
+    assert get_completion_class("powershell") is completion.PowerShellComplete
+
+
+def test_the_powershell_script_registers_a_native_completer_for_credux():
+    script = completion.source("powershell", cli)
+
+    assert "Register-ArgumentCompleter -Native -CommandName credux" in script
+    # The instruction the script asks for has to be the one the class is
+    # registered under, or credux answers it with exit status 1.
+    assert "powershell_complete" in script
+
+
+def powershell_lines(words: str, cword: int, monkeypatch) -> list[str]:
+    """What credux would print back to the PowerShell completer.
+
+    Goes through the registered class the way the running binary does: the
+    script sets these two variables and reads stdout, so this is the whole
+    protocol.
+    """
+    monkeypatch.setenv("COMP_WORDS", words)
+    monkeypatch.setenv("COMP_CWORD", str(cword))
+    engine = completion.PowerShellComplete(cli, {}, "credux", completion.COMPLETE_VAR)
+    return engine.complete().splitlines()
+
+
+def test_the_powershell_protocol_completes_subcommands(credux_home, monkeypatch):
+    lines = powershell_lines("credux config ", 2, monkeypatch)
+
+    assert [line.split("\t")[1] for line in lines] == ["edit", "get", "path", "set", "show"]
+
+
+def test_the_powershell_protocol_completes_profile_names(credux_home, monkeypatch):
+    write_config(credux_home, [credential("acme-billing-User-ada")])
+
+    lines = powershell_lines("credux env acme", 2, monkeypatch)
+
+    assert lines == ["plain\tacme-billing-User-ada\t"]
+
+
+def test_the_powershell_protocol_puts_each_completion_on_exactly_one_line():
+    """The script splits stdout by line and then by tab, so a help string
+    carrying either would shift every field after it."""
+    engine = completion.PowerShellComplete(cli, {}, "credux", completion.COMPLETE_VAR)
+
+    line = engine.format_completion(CompletionItem("posix", help="one\ttwo\nthree"))
+
+    assert line == "plain\tposix\tone two three"
 
 
 def test_the_posix_snippet_carries_both_scripts_without_either_being_code():

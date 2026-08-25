@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "credux"
-version = "0.3.1"
+version = "0.3.2"
 description = "Manage cloud credentials and the profiles that use them"
 readme = "README.md"
 requires-python = ">=3.10"

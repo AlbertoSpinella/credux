@@ -190,6 +190,24 @@ def _unlock(venv: str) -> None:
                 continue
 
 
+def _refuse_windows_self_replacement(manual: str) -> None:
+    """Refuse an upgrade Windows cannot let a running credux perform.
+
+    Every installer path replaces a file credux is holding open. pipx recreates
+    the venv over the `python.exe` that is interpreting this call, and even a
+    plain pip upgrade rewrites the `credux.exe` shim that *is* the running
+    process. Windows locks an executable's image for as long as it runs, so
+    the install stops partway with a permission error, having already spent
+    the download. Refusing first costs nothing and says something true.
+    """
+    raise UpgradeError(
+        "credux cannot upgrade itself on Windows: the installer has to replace "
+        "the credux.exe that is running this command, and Windows locks an "
+        "executable while it is running. Nothing has been downloaded or "
+        f"changed. Run this from a shell where credux is not running: {manual}"
+    )
+
+
 def _installer(spec: str) -> tuple[str, list[str], str | None]:
     """Work out which installer owns this installation, and how to drive it.
 
@@ -209,6 +227,8 @@ def _installer(spec: str) -> tuple[str, list[str], str | None]:
     prefix = Path(sys.prefix)
     manual = f"pipx install --force {_PIPX_NO_CACHE} {spec}"
     if prefix.parent.name == "venvs" and prefix.parent.parent.name == "pipx":
+        if sys.platform.startswith("win"):
+            _refuse_windows_self_replacement(manual)
         pipx = _which("pipx")
         if pipx is None:
             raise UpgradeError(
@@ -218,6 +238,10 @@ def _installer(spec: str) -> tuple[str, list[str], str | None]:
         return "pipx", [pipx, "install", "--force", _PIPX_NO_CACHE, spec], str(prefix)
 
     if sys.prefix != sys.base_prefix:
+        if sys.platform.startswith("win"):
+            _refuse_windows_self_replacement(
+                f"{sys.executable} -m pip install --upgrade {_NO_CACHE} {spec}"
+            )
         return (
             "pip",
             [sys.executable, "-m", "pip", "install", "--upgrade", _NO_CACHE, spec],

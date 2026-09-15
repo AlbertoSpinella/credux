@@ -71,7 +71,10 @@ credux upgrade --from ./credux   # whatever is checked out in a local clone
 
 It drives whichever installer owns the environment credux is running in, and
 refuses an editable install or an installation outside any virtual environment
-rather than writing over either. Details in
+rather than writing over either. On Windows it refuses to upgrade itself at
+all, and prints the command to run from a shell where credux is not running:
+the installer would have to replace the running `credux.exe`, which Windows
+locks. Details in
 [docs/releasing.md](docs/releasing.md#how-credux-upgrade-works).
 
 ## Quickstart

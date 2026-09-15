@@ -42,6 +42,15 @@ This is why the tag push is not optional: it is what triggers publication.
 Until the workflow has run and the version is on the index, `credux upgrade`
 keeps reporting the previous version as the newest one.
 
+**Windows upgrades itself from outside.** Every installer path replaces a file
+a running credux is holding open: pipx recreates the venv over the `python.exe`
+interpreting the call, and even a plain pip upgrade rewrites the `credux.exe`
+shim that is the process itself. Windows locks an executable's image while it
+runs, so the install stops partway with a permission error, after the download.
+Credux refuses before any of that and prints the exact command to run from a
+shell where credux is not running. POSIX is unaffected: unlinking a running
+binary there is ordinary.
+
 **Resolving the version.** With no `--version`, `upgrade` asks the index for the
 project's newest release and stops without installing anything if that is
 already the version being run. `--version` always installs, even over

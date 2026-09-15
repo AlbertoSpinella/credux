@@ -78,6 +78,22 @@ template. Add a distinguishing variable such as `{account_id}`, or re-run with
 Center. See
 [configuration.md](configuration.md#re-templating-an-existing-credential).
 
+## `credux upgrade` refuses to run on Windows
+
+```
+credux cannot upgrade itself on Windows: the installer has to replace the
+credux.exe that is running this command, and Windows locks an executable while
+it is running.
+```
+
+Working as intended, and nothing was downloaded or changed. Copy the command
+the message ends with and run it from a shell where credux is not running; it
+is the same install credux would have performed. Before the refusal existed the
+attempt went ahead and failed partway, with
+`[Errno 13] Permission denied: ...\Scripts\python.exe` and a venv left
+untouched only because pipx declined to remove one it had not created. See
+[releasing.md](releasing.md#how-credux-upgrade-works).
+
 ## `credux upgrade` cannot find the version it just announced
 
 ```

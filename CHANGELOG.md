@@ -5,6 +5,22 @@ and every release is one commit: the history of this repository is the list
 below. Versions follow [semantic versioning](https://semver.org/); while the
 major version is `0`, a minor bump is where a breaking change may appear.
 
+## 0.3.4 - 2026-09-15
+
+### Fixed
+
+- **`credux upgrade` says what Windows cannot do, instead of failing partway
+  through doing it.** Every installer path replaces a file a running credux is
+  holding open: pipx recreates the venv over the `python.exe` interpreting the
+  call, and even a plain pip upgrade rewrites the `credux.exe` shim that is the
+  process itself. Windows locks an executable's image while it runs, so the
+  install stopped with `[Errno 13] Permission denied` after spending the whole
+  download, leaving an installation that was neither upgraded nor clearly
+  broken. credux now refuses before any of it and prints the exact command to
+  run from a shell where credux is not running, which is the same install it
+  would have performed. POSIX is untouched: replacing a running binary there is
+  ordinary, and the upgrade works as it always has.
+
 ## 0.3.3 - 2026-09-15
 
 ### Fixed

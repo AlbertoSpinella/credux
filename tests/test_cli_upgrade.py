@@ -27,12 +27,18 @@ def make_runner():
 
 @pytest.fixture
 def calls(credux_home, monkeypatch):
-    """A pipx installation whose subprocess calls are recorded, never run."""
+    """A pipx installation whose subprocess calls are recorded, never run.
+
+    Pinned to a POSIX platform: credux refuses to replace its own running
+    executable on Windows, so an unpinned test would assert one thing on a CI
+    runner and another on a maintainer's machine.
+    """
     monkeypatch.setattr(upgrade, "_is_editable", lambda: False)
     monkeypatch.setattr(upgrade, "_which", lambda name: "/usr/bin/pipx")
     monkeypatch.setattr(upgrade, "current_version", lambda: "0.1.0")
     monkeypatch.setattr(sys, "prefix", PIPX_PREFIX)
     monkeypatch.setattr(sys, "base_prefix", "/usr")
+    monkeypatch.setattr(sys, "platform", "linux")
 
     recorded = []
 

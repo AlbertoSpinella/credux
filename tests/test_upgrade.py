@@ -67,10 +67,17 @@ class FakeFetch:
 
 @pytest.fixture
 def pipx_env(monkeypatch):
-    """A pipx-managed, non-editable installation with pipx on PATH."""
+    """A pipx-managed, non-editable installation with pipx on PATH.
+
+    The platform is pinned along with the layout: credux refuses to replace
+    its own running executable on Windows, so a test that planned an install
+    without saying which platform it meant would assert one thing on a Linux
+    runner and another on the maintainer's machine.
+    """
     monkeypatch.setattr(upgrade, "_is_editable", lambda: False)
     monkeypatch.setattr(sys, "prefix", PIPX_PREFIX)
     monkeypatch.setattr(sys, "base_prefix", "/usr")
+    monkeypatch.setattr(sys, "platform", "linux")
     return None
 
 
@@ -117,6 +124,7 @@ def test_a_plain_virtualenv_is_upgraded_with_its_own_pip(monkeypatch):
     monkeypatch.setattr(upgrade, "_is_editable", lambda: False)
     monkeypatch.setattr(sys, "prefix", VENV_PREFIX)
     monkeypatch.setattr(sys, "base_prefix", "/usr")
+    monkeypatch.setattr(sys, "platform", "linux")
 
     plan = upgrade.plan(version="0.2.0")
 
@@ -207,6 +215,7 @@ def test_a_pip_plan_carries_no_venv_to_unlock(monkeypatch):
     monkeypatch.setattr(upgrade, "_is_editable", lambda: False)
     monkeypatch.setattr(sys, "prefix", VENV_PREFIX)
     monkeypatch.setattr(sys, "base_prefix", "/usr")
+    monkeypatch.setattr(sys, "platform", "linux")
 
     assert upgrade.plan(version="0.2.0").venv is None
 
@@ -303,6 +312,7 @@ def test_the_pip_command_bypasses_pips_index_cache(monkeypatch):
     monkeypatch.setattr(upgrade, "_is_editable", lambda: False)
     monkeypatch.setattr(sys, "prefix", VENV_PREFIX)
     monkeypatch.setattr(sys, "base_prefix", "/usr")
+    monkeypatch.setattr(sys, "platform", "linux")
 
     plan = upgrade.plan(version="0.2.0")
 
@@ -406,3 +416,50 @@ def test_a_failure_that_is_not_about_a_missing_version_is_left_alone():
         upgrade.apply(plan, runner=runner)
 
     assert "cache" not in str(excinfo.value).lower()
+
+
+def test_a_windows_pipx_install_is_refused_with_the_command_to_run_by_hand(
+    pipx_env, monkeypatch
+):
+    """Windows locks an executable's file while it is running, and every path
+    an installer could take replaces one credux is holding open: pipx recreates
+    the venv over its `python.exe`, and even a plain pip upgrade rewrites the
+    `credux.exe` shim that is the running process. The install fails partway
+    with an errno, so refuse before anything is downloaded and hand the user
+    the command to run from a shell where credux is not running."""
+    monkeypatch.setattr(upgrade, "_which", lambda name: "pipx")
+    monkeypatch.setattr(sys, "platform", "win32")
+
+    with pytest.raises(UpgradeError) as excinfo:
+        upgrade.plan(version="0.2.0")
+
+    message = str(excinfo.value)
+    assert "pipx install --force --pip-args=--no-cache-dir credux==0.2.0" in message
+    assert "running" in message
+
+
+def test_a_windows_venv_install_is_refused_with_its_own_pip_command(monkeypatch):
+    """The same lock, a different installer: say pip here, not pipx."""
+    monkeypatch.setattr(upgrade, "_is_editable", lambda: False)
+    monkeypatch.setattr(sys, "prefix", VENV_PREFIX)
+    monkeypatch.setattr(sys, "base_prefix", str(Path("/usr")))
+    monkeypatch.setattr(sys, "platform", "win32")
+
+    with pytest.raises(UpgradeError) as excinfo:
+        upgrade.plan(version="0.2.0")
+
+    assert "pip install --upgrade --no-cache-dir credux==0.2.0" in str(excinfo.value)
+
+
+def test_a_windows_editable_checkout_still_says_it_is_editable(monkeypatch):
+    """The editable refusal is about what the install *is*, so it outranks the
+    platform one: 'git pull' stays the right answer on Windows too."""
+    monkeypatch.setattr(upgrade, "_is_editable", lambda: True)
+    monkeypatch.setattr(sys, "prefix", VENV_PREFIX)
+    monkeypatch.setattr(sys, "base_prefix", str(Path("/usr")))
+    monkeypatch.setattr(sys, "platform", "win32")
+
+    with pytest.raises(UpgradeError) as excinfo:
+        upgrade.plan(version="0.2.0")
+
+    assert "editable" in str(excinfo.value)

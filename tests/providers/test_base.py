@@ -131,3 +131,19 @@ def test_default_client_factory_is_read_from_the_module_at_call_time(monkeypatch
 
     assert result == "fake-client"
     assert calls == [(("sts",), {"region": "eu-west-1"})]
+
+
+def test_default_client_factory_ignores_an_ambient_aws_profile(tmp_path, monkeypatch):
+    """credux produces profile names, it never consumes them: `credux env`
+    exports AWS_PROFILE for the user's shell, and that export must not reach
+    credux's own clients. A bare boto3.client(...) builds the default session,
+    which reads AWS_PROFILE, so a stale or not-yet-written profile makes
+    `credux login` die with ProfileNotFound before it can write that very
+    profile."""
+    monkeypatch.setenv("AWS_PROFILE", "acme-dev-SSO-Admin")
+    monkeypatch.setenv("AWS_CONFIG_FILE", str(tmp_path / "config"))
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(tmp_path / "credentials"))
+
+    client = base.default_client_factory("sso-oidc", region="eu-central-1")
+
+    assert client.meta.region_name == "eu-central-1"

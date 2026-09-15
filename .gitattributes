@@ -1,0 +1,13 @@
+# git's autocrlf is on by default on Windows and rewrites a checkout unless an
+# attribute says otherwise. A carriage return is not whitespace to a POSIX
+# shell, it is part of the last token on the line, so a converted script is a
+# broken one. The wrapper under src/credux/shell/ is shipped in the wheel and
+# printed by `credux shell-init` for the user to eval, which would carry the
+# breakage to every user of a package built on Windows.
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+*.fish text eol=lf
+
+# PowerShell reads either, and a .ps1 is conventionally CRLF on Windows.
+*.ps1 text

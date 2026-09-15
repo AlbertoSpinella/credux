@@ -35,6 +35,14 @@ credentials=)` callable, threaded through `ResolutionContext`, so tests can
 substitute a stubbed client. `providers/base.default_client_factory` is the only
 place that calls `boto3.client(...)` for real.
 
+That one place builds its own botocore session with the `profile` variable
+detached from the environment. credux writes profile names, it never reads
+them: `credux env` exports `AWS_PROFILE` for the user's shell, and boto3's
+default session would read that export straight back in, so a profile that is
+stale or not yet written would break the very command that writes it -
+`credux login` died with `ProfileNotFound` before reaching the network. Every
+other AWS environment variable is left alone.
+
 ## Invariants
 
 These must hold after any change, not just before your change shipped.

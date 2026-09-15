@@ -1,12 +1,16 @@
 import sys
+from pathlib import Path
 
 import pytest
 
 from credux import upgrade
 from credux.errors import UpgradeError, UsageError
 
-PIPX_PREFIX = "/home/someone/.local/share/pipx/venvs/credux"
-VENV_PREFIX = "/home/someone/src/credux/.venv"
+# Spelled the way the running OS spells a path: `_installer` reports the venv
+# as `str(Path(sys.prefix))`, which on Windows turns every forward slash into a
+# backslash, so a hardcoded POSIX prefix could never match what it returns.
+PIPX_PREFIX = str(Path("/home/someone/.local/share/pipx/venvs/credux"))
+VENV_PREFIX = str(Path("/home/someone/src/credux/.venv"))
 
 def test_the_install_spec_never_points_at_a_private_source(pipx_env, monkeypatch) -> None:
     """The published project is the only thing a release may install from.

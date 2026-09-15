@@ -1,11 +1,11 @@
 import os
-import shutil
 import subprocess
 
 import pytest
 from click.testing import CliRunner
 
 from credux.cli import cli
+from tests.shellsupport import BASH, ZSH
 
 
 def wrapper_source(shell: str) -> str:
@@ -37,14 +37,14 @@ def run_cdx(tmp_path, argument: str | None) -> subprocess.CompletedProcess:
     invocation = "cdx" if argument is None else f"cdx {argument}"
     script.write_text(f"{wrapper_source('posix')}\n{invocation}\n", encoding="utf-8")
     return subprocess.run(
-        ["bash", str(script)],
-        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        [BASH, str(script)],
+        env={**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}"},
         capture_output=True,
         text=True,
     )
 
 
-@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash to run the wrapper")
+@pytest.mark.skipif(BASH is None, reason="needs bash to run the wrapper")
 def test_the_posix_wrapper_propagates_a_credux_failure(credux_home, tmp_path):
     """`eval "$(credux env ...)"` reports eval's status, not credux's, so
     `cdx badprofile` used to exit 0 and silently do nothing."""
@@ -56,7 +56,7 @@ def test_the_posix_wrapper_propagates_a_credux_failure(credux_home, tmp_path):
     assert "credux: boom" in result.stderr
 
 
-@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash to run the wrapper")
+@pytest.mark.skipif(BASH is None, reason="needs bash to run the wrapper")
 def test_the_posix_wrapper_propagates_a_failure_with_no_argument(credux_home, tmp_path):
     stub_credux(tmp_path, exit_code=3)
 
@@ -65,7 +65,7 @@ def test_the_posix_wrapper_propagates_a_failure_with_no_argument(credux_home, tm
     assert result.returncode == 3
 
 
-@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash to run the wrapper")
+@pytest.mark.skipif(BASH is None, reason="needs bash to run the wrapper")
 def test_the_posix_wrapper_evaluates_the_statement_on_success(credux_home, tmp_path):
     stub_credux(tmp_path, exit_code=0, stdout='export AWS_PROFILE="acme-dev"\n')
     script = tmp_path / "run.sh"
@@ -75,8 +75,8 @@ def test_the_posix_wrapper_evaluates_the_statement_on_success(credux_home, tmp_p
     )
 
     result = subprocess.run(
-        ["bash", str(script)],
-        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        [BASH, str(script)],
+        env={**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}"},
         capture_output=True,
         text=True,
     )
@@ -154,27 +154,27 @@ def test_shell_init_rejects_an_unknown_shell(credux_home):
 # regressing; neither can be replaced by an assertion on the text.
 
 
-@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+@pytest.mark.skipif(BASH is None, reason="needs bash")
 def test_the_posix_shell_init_output_parses_under_bash(credux_home, tmp_path):
     script = tmp_path / "init.sh"
     script.write_text(wrapper_source("posix"), encoding="utf-8")
 
-    result = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True)
+    result = subprocess.run([BASH, "-n", str(script)], capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.skipif(shutil.which("zsh") is None, reason="needs zsh")
+@pytest.mark.skipif(ZSH is None, reason="needs zsh")
 def test_the_posix_shell_init_output_parses_under_zsh(credux_home, tmp_path):
     script = tmp_path / "init.zsh"
     script.write_text(wrapper_source("posix"), encoding="utf-8")
 
-    result = subprocess.run(["zsh", "-n", str(script)], capture_output=True, text=True)
+    result = subprocess.run([ZSH, "-n", str(script)], capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+@pytest.mark.skipif(BASH is None, reason="needs bash")
 def test_bash_registers_the_completion_and_not_zshs(credux_home, tmp_path):
     """Registration, not just parseability: `complete -p credux` is bash's own
     record of what it will call on TAB."""
@@ -184,7 +184,7 @@ def test_bash_registers_the_completion_and_not_zshs(credux_home, tmp_path):
         encoding="utf-8",
     )
 
-    result = subprocess.run(["bash", str(script)], capture_output=True, text=True)
+    result = subprocess.run([BASH, str(script)], capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
     assert "_credux_completion" in result.stdout
@@ -195,7 +195,7 @@ def test_bash_registers_the_completion_and_not_zshs(credux_home, tmp_path):
     assert "-F _credux_completion credux" in result.stdout
 
 
-@pytest.mark.skipif(shutil.which("zsh") is None, reason="needs zsh")
+@pytest.mark.skipif(ZSH is None, reason="needs zsh")
 def test_zsh_registers_the_completion_and_not_bashs(credux_home, tmp_path):
     script = tmp_path / "init.zsh"
     script.write_text(
@@ -205,7 +205,7 @@ def test_zsh_registers_the_completion_and_not_bashs(credux_home, tmp_path):
         encoding="utf-8",
     )
 
-    result = subprocess.run(["zsh", str(script)], capture_output=True, text=True)
+    result = subprocess.run([ZSH, str(script)], capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
     assert "registered:_credux_completion" in result.stdout
@@ -248,7 +248,9 @@ def stub_completions(directory, names) -> None:
     body = "".join(f'printf "%s\\n" {name!r}\n' for name in names)
     script.write_text(
         "#!/bin/sh\n"
-        f'printf "%s\\n" "$@" > {directory}/argv\n'
+        # as_posix(): the backslashes of a Windows path would be read as
+        # escapes by the /bin/sh this stub is written for.
+        f'printf "%s\\n" "$@" > {directory.as_posix()}/argv\n'
         'echo "credux: boom" >&2\n'
         f"{body}"
         "exit 0\n",
@@ -257,18 +259,18 @@ def stub_completions(directory, names) -> None:
     os.chmod(script, 0o755)
 
 
-@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+@pytest.mark.skipif(BASH is None, reason="needs bash")
 def test_bash_registers_a_completer_for_cdx(credux_home, tmp_path):
     script = tmp_path / "init.sh"
     script.write_text(f"{wrapper_source('posix')}\ncomplete -p cdx\n", encoding="utf-8")
 
-    result = subprocess.run(["bash", str(script)], capture_output=True, text=True)
+    result = subprocess.run([BASH, str(script)], capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
     assert "-F _credux_cdx_completion_bash cdx" in result.stdout
 
 
-@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+@pytest.mark.skipif(BASH is None, reason="needs bash")
 def test_the_bash_cdx_completer_offers_the_names_credux_prints(credux_home, tmp_path):
     stub_completions(tmp_path, ["acme-billing-User-ada", "beta-billing-User-bob"])
     script = tmp_path / "init.sh"
@@ -282,8 +284,8 @@ def test_the_bash_cdx_completer_offers_the_names_credux_prints(credux_home, tmp_
     )
 
     result = subprocess.run(
-        ["bash", str(script)],
-        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        [BASH, str(script)],
+        env={**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}"},
         capture_output=True,
         text=True,
     )
@@ -296,7 +298,7 @@ def test_the_bash_cdx_completer_offers_the_names_credux_prints(credux_home, tmp_
     assert "boom" not in result.stdout
 
 
-@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
+@pytest.mark.skipif(BASH is None, reason="needs bash")
 def test_the_bash_cdx_completer_forwards_the_word_being_typed(credux_home, tmp_path):
     """Without the current word, `cdx mana<TAB>` would offer every profile."""
     stub_completions(tmp_path, ["acme-billing-User-ada"])
@@ -310,8 +312,8 @@ def test_the_bash_cdx_completer_forwards_the_word_being_typed(credux_home, tmp_p
     )
 
     subprocess.run(
-        ["bash", str(script)],
-        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        [BASH, str(script)],
+        env={**os.environ, "PATH": f"{tmp_path}{os.pathsep}{os.environ['PATH']}"},
         capture_output=True,
         text=True,
     )
@@ -320,7 +322,7 @@ def test_the_bash_cdx_completer_forwards_the_word_being_typed(credux_home, tmp_p
     assert argv == ["completions", "profiles", "billing"]
 
 
-@pytest.mark.skipif(shutil.which("zsh") is None, reason="needs zsh")
+@pytest.mark.skipif(ZSH is None, reason="needs zsh")
 def test_zsh_registers_a_completer_for_cdx(credux_home, tmp_path):
     script = tmp_path / "init.zsh"
     script.write_text(
@@ -330,7 +332,7 @@ def test_zsh_registers_a_completer_for_cdx(credux_home, tmp_path):
         encoding="utf-8",
     )
 
-    result = subprocess.run(["zsh", str(script)], capture_output=True, text=True)
+    result = subprocess.run([ZSH, str(script)], capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
     assert "registered:_credux_cdx_completion_zsh" in result.stdout

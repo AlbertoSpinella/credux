@@ -83,13 +83,22 @@ def default_client_factory(
 ) -> Any:
     """Build a boto3 client. Injected so tests can hand back a stubbed client."""
     import boto3
+    import botocore.session
 
     kwargs: dict[str, Any] = {}
     if region:
         kwargs["region_name"] = region
     if credentials is not None:
         kwargs.update(credentials.as_boto_kwargs())
-    return boto3.client(service, **kwargs)
+    # credux writes profile names, it never reads them: `credux env` exports
+    # AWS_PROFILE for the user's shell, and boto3's default session would read
+    # that export back in here, so a stale or not-yet-written profile would
+    # break the very command that writes it. Dropping the env lookup for the
+    # profile variable leaves every other AWS setting alone.
+    botocore_session = botocore.session.Session(
+        session_vars={"profile": (None, None, None, None)}
+    )
+    return boto3.session.Session(botocore_session=botocore_session).client(service, **kwargs)
 
 
 class ResolutionContext:

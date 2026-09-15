@@ -5,6 +5,41 @@ and every release is one commit: the history of this repository is the list
 below. Versions follow [semantic versioning](https://semver.org/); while the
 major version is `0`, a minor bump is where a breaking change may appear.
 
+## 0.3.3 - 2026-09-15
+
+### Fixed
+
+- **An `AWS_PROFILE` left in the environment no longer breaks credux's own
+  commands.** `credux env`, and the `cdx` function built on it, export
+  `AWS_PROFILE` for the calling shell, and credux's own boto3 clients read it
+  straight back in. Pointing that variable at a profile that was stale, or
+  simply not written yet, made `credux login` fail with `ProfileNotFound`
+  before it reached the network: the command that writes a profile could not
+  run while the variable naming it was set, and a machine with no
+  `~/.aws/config` at all hit this on its very first login. credux derives
+  profile names, it never reads them, so its clients now ignore the variable
+  entirely. Every other AWS environment variable is untouched.
+- **The shell wrapper can no longer ship with Windows line endings.**
+  `credux shell-init` prints `credux.sh` for the shell to `eval`, and git
+  rewrites a checkout to CRLF on Windows unless an attribute forbids it, so a
+  package built there would have handed every user a snippet with a carriage
+  return at the end of each line. The shell files are now pinned to LF.
+
+## 0.3.2 - 2026-08-25
+
+### Added
+
+- **`credux` completes in PowerShell.** `shell-init --shell powershell`
+  emitted the `cdx` wrapper and a completer for `cdx` alone, because Click
+  ships no PowerShell completion backend and `completion.source(...)` returned
+  nothing for it. What was missing is the script, not the mechanism: the
+  protocol is two environment variables in and one candidate per line out, so
+  credux registers a `PowerShellComplete` with Click rather than special-casing
+  the shell above it. Windows PowerShell 5.1 still does not consult a native
+  completer while the token under the cursor is a bare `-` or `--`; that is the
+  host, not the script. `cmd` has no completion backend and no wrapper to carry
+  one.
+
 ## 0.3.1 - 2026-08-24
 
 ### Fixed

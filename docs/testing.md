@@ -33,10 +33,25 @@ import fixtures from `tests.test_store`.
 - **Every test isolates the filesystem** with the `credux_home` fixture
   (`tests/conftest.py`, which sets `CREDUX_HOME` to a `tmp_path` subdirectory)
   and `tmp_path` for anything else on disk. No test may touch a real `~/.aws`.
+- **Every test runs with the developer's AWS environment scrubbed.** The
+  autouse `isolated_aws_environment` fixture (`tests/conftest.py`) drops
+  `AWS_PROFILE`/`AWS_DEFAULT_PROFILE` and points `AWS_CONFIG_FILE` and
+  `AWS_SHARED_CREDENTIALS_FILE` at `tmp_path`. Without it, any bare
+  `boto3.client(...)` - the `stubbed_client` fixture included - picks up the
+  `AWS_PROFILE` that `credux env` exported into your shell, and the provider
+  suite fails with `ProfileNotFound` on a working machine while passing in a
+  clean CI runner.
 - **Every test that touches `store.py` uses the in-memory `memory_keyring`
   fixture** (defined in `tests/test_store.py`, imported into other test modules
   with `from tests.test_store import memory_keyring  # noqa: F401`), never the
   real OS keychain.
+- **A test that runs a shell script gets its interpreter from
+  `tests/shellsupport.py`**, never from the bare name `bash`. On Windows
+  `subprocess` hands a bare name to CreateProcess, which searches System32
+  before PATH and finds the WSL launcher that ships there, so the shell a test
+  probes with `shutil.which` is not the shell it would run. The same module is
+  why a `.sh` path is passed to that interpreter as an argument rather than
+  executed directly, which Windows cannot do at all.
 - **No test launches a real browser or reaches the network.**
   `sso_login.login` and `browser.open_container` both accept an injectable
   opener/sleeper/runner for exactly this reason.

@@ -152,6 +152,11 @@ your terminal: `login` prints the confirmation code and tries to open the
 verification URL in a browser, so it needs *some* way to reach a browser, either
 locally or by copying the printed URL elsewhere.
 
+To keep each session's sign-in in its own browser container, give the session a
+`container` (`credux add sso-session acme ... --container Acme`): `login` then
+opens the page through `browser_command`, like `credux console` does. See
+[configuration.md](configuration.md#sso_sessions).
+
 Profile names for discovered roles come from the `naming.iam_sso` template,
 which starts out as credux's default and is meant to be replaced
 (`credux config set naming.iam_sso '<template>'`). Changing it later is safe:

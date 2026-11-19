@@ -5,6 +5,21 @@ and every release is one commit: the history of this repository is the list
 below. Versions follow [semantic versioning](https://semver.org/); while the
 major version is `0`, a minor bump is where a breaking change may appear.
 
+## 0.4.0 - 2026-11-19
+
+### Added
+
+- **`credux login` can open the sign-in page in a named browser container.**
+  AWS now serves the Identity Center device-authorization page from a regional
+  sign-in host shared by every Identity Center instance
+  (`<region>.signin.aws`), so a browser rule that sends an instance's
+  `<name>.awsapps.com` portal to a container no longer catches the login, and
+  a rule on the shared host would catch every other instance too. An Identity Center session now takes an
+  optional `container` (`credux add sso-session ... --container NAME`, or
+  `credux config edit`), and `login` then opens the page through
+  `browser_command`, the same path `credux console` uses. Sessions without one
+  behave exactly as before.
+
 ## 0.3.4 - 2026-09-15
 
 ### Fixed

@@ -207,6 +207,63 @@ def test_login_runs_the_device_flow(runner, monkeypatch):
     assert called["session"] == "acme"
 
 
+def test_login_without_a_container_leaves_the_opener_to_sso_login(runner, monkeypatch):
+    # No 'container' in the session: sso_login keeps its own default
+    # (webbrowser.open), exactly as before the setting existed.
+    seen = {}
+
+    def fake_login(session_name, session_cfg, client_factory, opener=None, **kwargs):
+        seen["opener"] = opener
+        return "tok"
+
+    monkeypatch.setattr(cli_module.sso_login, "login", fake_login)
+
+    result = runner.invoke(cli, ["login", "acme"])
+
+    assert result.exit_code == 0, result.output
+    assert seen["opener"] is None
+
+
+def test_login_opens_the_verification_page_in_the_session_container(runner, monkeypatch):
+    # The verification page is served from a sign-in host shared by every
+    # Identity Center instance in the region, so a per-host container rule in
+    # the browser cannot route it. The session names its container instead,
+    # and the page goes through the same browser_command as 'credux console'.
+    config = Config.load()
+    config.sso_sessions["acme"]["container"] = "Acme Work"
+    config.settings["browser_command"] = ["firefox", "ext+container:name={profile_encoded}&url={url_encoded}"]
+    config.save()
+    launched = []
+    monkeypatch.setattr(browser.subprocess, "Popen", lambda argv: launched.append(argv))
+
+    def fake_login(session_name, session_cfg, client_factory, opener=None, **kwargs):
+        opener("https://eu-west-1.signin.example/authorize?request_uri=a&b=c")
+        return "tok"
+
+    monkeypatch.setattr(cli_module.sso_login, "login", fake_login)
+
+    result = runner.invoke(cli, ["login", "acme"])
+
+    assert result.exit_code == 0, result.output
+    assert launched == [[
+        "firefox",
+        "ext+container:name=Acme%20Work"
+        "&url=https%3A%2F%2Feu-west-1.signin.example%2Fauthorize%3Frequest_uri%3Da%26b%3Dc",
+    ]]
+
+
+def test_login_rejects_a_container_that_is_not_a_non_empty_string(runner, monkeypatch):
+    config = Config.load()
+    config.sso_sessions["acme"]["container"] = ""
+    config.save()
+    monkeypatch.setattr(cli_module.sso_login, "login", lambda *a, **k: "tok")
+
+    result = runner.invoke(cli, ["login", "acme"])
+
+    assert result.exit_code == UsageError.exit_code
+    assert "sso_sessions.acme.container" in result.output
+
+
 def test_sync_creates_credentials_and_runs_integrations(runner, monkeypatch, tmp_path):
     monkeypatch.setattr(cli_module.sso_login, "token_or_raise", lambda name: "tok")
     monkeypatch.setattr(

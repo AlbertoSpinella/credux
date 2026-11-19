@@ -37,7 +37,7 @@ non-numeric `version` is a configuration error.
 | `default_profile.enabled` | `true` | Whether to re-assert the fake `default` profile on every write. See below. |
 | `default_profile.access_key_id` | `test` | The fake key written into `default`. |
 | `default_profile.secret_access_key` | `test` | The fake secret written into `default`. |
-| `browser_command` | Firefox container URL, see below | argv list run by `credux console`. |
+| `browser_command` | Firefox container URL, see below | argv list run by `credux console`, and by `credux login` for a session with a `container`. |
 | `refresh_threshold_minutes` | `10` | How close to expiry a session must be before a plain `credux refresh` re-resolves it. |
 | `console_destination` | `https://console.aws.amazon.com/` | Where the federation endpoint sends the browser after establishing the session. Set it to a deeper console URL (an account dashboard, a specific service page) to land somewhere more specific. |
 
@@ -208,13 +208,29 @@ login` and `credux sync`:
   "acme": {
     "start_url": "https://acme.awsapps.com/start",
     "sso_region": "eu-west-1",
-    "management_account_id": "111111111111"
+    "management_account_id": "111111111111",
+    "container": "Acme"
   }
 }
 ```
 
 `management_account_id` is optional; see above for what happens when it is
 missing.
+
+`container` is optional too. Without it, `credux login` opens the
+device-authorization page in the system's default browser. With it, the page
+goes through `browser_command` instead, with the container name in place of
+`{profile}` / `{profile_encoded}`, so with the default command it opens inside
+that Firefox container. A container that already exists is reused as it is;
+one that does not is created, styled from its name like a `credux console`
+container.
+
+The setting exists because a browser cannot route this page by itself: AWS
+serves the verification page from a regional sign-in host shared by every
+Identity Center instance (`<region>.signin.aws`), so a rule that sends a host
+to a container cannot tell one session from another. Set it with `credux add
+sso-session ... --container NAME`, or `credux config edit` for an existing
+session.
 
 ## `integrations`
 

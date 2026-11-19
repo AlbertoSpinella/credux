@@ -87,6 +87,26 @@ def _sso_session(app: App, name: str) -> dict:
     return session_cfg
 
 
+def _login_opener(app: App, name: str, session_cfg: dict):
+    """The opener for a session's device-authorization page, or None.
+
+    None leaves sso_login on its own default, the system browser. A session
+    with a `container` opens the page through `browser_command` instead, the
+    same path `credux console` uses: the verification page is served from a
+    sign-in host shared by every Identity Center instance in a region, so a
+    browser rule keyed on the host cannot tell one session from another.
+    """
+    if "container" not in session_cfg:
+        return None
+    container = session_cfg["container"]
+    if not isinstance(container, str) or not container.strip():
+        raise UsageError(
+            f"sso_sessions.{name}.container must be a non-empty container name"
+        )
+    command = app.config.setting("browser_command", [])
+    return lambda url: open_container(container, url, command)
+
+
 def _detect_management(
     app: App, account_id: str, resolved: ResolvedCredentials, region: str | None
 ) -> bool:
@@ -398,13 +418,17 @@ def add_iam_role(
 @click.option("--sso-region", prompt=True)
 @click.option("--management-account-id", default=None,
               help="Account id that should receive the management prefix.")
+@click.option("--container", default=None,
+              help="Browser container 'credux login' opens the sign-in page in.")
 @click.pass_context
-def add_sso_session(ctx, name, start_url, sso_region, management_account_id):
+def add_sso_session(ctx, name, start_url, sso_region, management_account_id, container):
     """Register an Identity Center session. Then run 'credux login NAME' and 'credux sync NAME'."""
     app = _app(ctx)
     session = {"start_url": start_url, "sso_region": sso_region}
     if management_account_id:
         session["management_account_id"] = management_account_id
+    if container:
+        session["container"] = container
     app.config.sso_sessions[name] = session
     app.save()
     console.print(
@@ -930,7 +954,12 @@ def login(ctx, session_name):
     """Run the Identity Center device authorization flow for a session."""
     app = _app(ctx)
     session_cfg = _sso_session(app, session_name)
-    sso_login.login(session_name, session_cfg, app.client_factory)
+    sso_login.login(
+        session_name,
+        session_cfg,
+        app.client_factory,
+        opener=_login_opener(app, session_name, session_cfg),
+    )
     console.print(f"Logged in to [bold]{session_name}[/bold]")
 
 

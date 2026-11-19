@@ -132,6 +132,28 @@ def test_add_sso_session_records_the_start_url(runner):
     assert Config.load().sso_sessions["acme"]["sso_region"] == "eu-west-1"
 
 
+def test_add_sso_session_stores_an_optional_container(runner):
+    result = runner.invoke(
+        cli,
+        ["add", "sso-session", "acme", "--start-url", "https://acme.awsapps.com/start",
+         "--sso-region", "eu-west-1", "--container", "Acme Work"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert Config.load().sso_sessions["acme"]["container"] == "Acme Work"
+
+
+def test_add_sso_session_omits_container_when_not_given(runner):
+    result = runner.invoke(
+        cli,
+        ["add", "sso-session", "acme", "--start-url", "https://acme.awsapps.com/start",
+         "--sso-region", "eu-west-1"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "container" not in Config.load().sso_sessions["acme"]
+
+
 def test_add_sso_session_points_at_login_before_sync(runner):
     # 'sync' calls sso_login.token_or_raise first, so a freshly registered
     # session cannot be synced until the device flow has run: the hint has to
